@@ -146,7 +146,7 @@ def send_message(
 
 @payable
 @external
-def read_remote_storage(
+def request_lzRead(
     _dst_eid: uint32,
     _target: address,
     _calldata: Bytes[128],
@@ -226,3 +226,9 @@ def quote_read_fee(
         callData=_calldata,
     )
     return lz._quote_lz_read_fee(request, _gas_limit, _data_size)
+
+
+@view
+@external
+def dummy_endpoint(_input: uint256) -> uint256:
+    return 2*_input
