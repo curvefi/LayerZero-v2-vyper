@@ -29,6 +29,7 @@ exports: (
     lz.LZ_ENDPOINT,
     lz.LZ_PEERS,
     lz.LZ_MESSAGE_SIZE_CAP,
+    lz.LZ_READ_CALLDATA_SIZE,
     lz.default_gas_limit,
     lz.quote_lz_fee,
     lz.nextNonce,
@@ -64,6 +65,17 @@ event MessageSent:
 event MessageReceived:
     source: uint32
     payload: String[128]
+
+
+event ReadRequestSent:
+    destination: uint32
+    target: address
+    payload: Bytes[128]
+
+
+event ReadResponseReceived:
+    source: uint32
+    response: String[128]
 
 
 ################################################################
@@ -134,6 +146,38 @@ def send_message(
 
 @payable
 @external
+def read_remote_storage(
+    _dst_eid: uint32,
+    _target: address,
+    _calldata: Bytes[128],
+    _gas_limit: uint256 = 0,
+    _data_size: uint32 = 64,
+):
+    """
+    @notice Send read request to another chain
+    @param _dst_eid Target chain ID
+    @param _target Contract to read from
+    @param _calldata Function call data
+    @param _gas_limit Optional gas limit
+    @param _data_size Expected response size
+    """
+    request: lz.EVMCallRequestV1 = lz.EVMCallRequestV1(
+        appRequestLabel=1,
+        targetEid=_dst_eid,
+        isBlockNum=False,  # Use latest state
+        blockNumOrTimestamp=convert(block.timestamp, uint64),
+        confirmations=15,
+        to=_target,
+        callData=_calldata,
+    )
+
+    # Send read request
+    lz._send_read_request(request, _gas_limit, _data_size)
+    log ReadRequestSent(_dst_eid, _target, _calldata)
+
+
+@payable
+@external
 def lzReceive(
     _origin: lz.Origin,
     _guid: bytes32,
@@ -142,14 +186,43 @@ def lzReceive(
     _extraData: Bytes[64],
 ) -> bool:
     """
-    @notice Handle incoming messages from other chains
-    @dev Verifies sender and converts message back to string
+    @notice Handle both regular messages and read responses
     """
     # Verify message source
     assert lz._lz_receive(_origin, _guid, _message, _executor, _extraData)
 
-    # Convert and store message
-    message: String[128] = convert(_message, String[128])
-    log MessageReceived(_origin.srcEid, message)
+    if _origin.srcEid > lz.READ_CHANNEL_THRESHOLD:
+        # Handle read response
+        message: String[128] = convert(_message, String[128])
+        log ReadResponseReceived(_origin.srcEid, message)
+    else:
+        # Handle regular message
+        message: String[128] = convert(_message, String[128])
+        log MessageReceived(_origin.srcEid, message)
 
     return True
+
+
+@view
+@external
+def quote_read_fee(
+    _dst_eid: uint32,
+    _target: address,
+    _calldata: Bytes[128],
+    _gas_limit: uint256 = 0,
+    _data_size: uint32 = 64,
+) -> uint256:
+    """
+    @notice Quote fee for read request
+    @dev alternative wrapper that creates EVMCallRequestV1
+    """
+    request: lz.EVMCallRequestV1 = lz.EVMCallRequestV1(
+        appRequestLabel=1,
+        targetEid=_dst_eid,
+        isBlockNum=False,
+        blockNumOrTimestamp=convert(block.timestamp, uint64),
+        confirmations=15,
+        to=_target,
+        callData=_calldata,
+    )
+    return lz._quote_lz_read_fee(request, _gas_limit, _data_size)

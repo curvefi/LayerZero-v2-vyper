@@ -1,22 +1,27 @@
+import time
+from conftest import LZ_ENDPOINT_ID
+
 GAS_LZ_FEE = 500_000
 
 
-# def test_quote_lz_read_fee(forked_env, lz_module_contract):
-#     """Test basic quote for default LZ receive option"""
-#     # Get quote for basic message
-#     fee = lz_module_contract.eval(
-#         f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {lz_module_contract.address}, {b'0'}, {GAS_LZ_FEE})"
-#     )
-#     print(f"\nBasic quote fee: {fee}")
+def test_quote_lz_read_fee(forked_env, lz_module_contract):
+    """Test basic quote for default LZ receive option"""
+    # Get quote for basic message
+    # now compare with external method
+    request_tuple = (
+        1,  # appRequestLabel
+        LZ_ENDPOINT_ID,  # targetEid
+        False,  # isBlockNum
+        int(time.time()),  # blockNumOrTimestamp
+        15,  # confirmations
+        lz_module_contract.address,  # to
+        bytes.fromhex("aabbcc"),  # callData
+    )
+    fee = lz_module_contract.quote_lz_read_fee(request_tuple, GAS_LZ_FEE, 128)
+    print(f"\nBasic lzRead fee: {fee}")
 
-#     # Should return non-zero fee
-#     assert fee > 0, "Fee should not be zero"
-
-#     # now compare with external method
-#     fee_external = lz_module_contract.quote_lz_fee(
-#         LZ_ENDPOINT_ID, lz_module_contract.address, b"0", GAS_LZ_FEE
-#     )
-#     assert fee == fee_external, "Fees should match"
+    # Should return non-zero fee
+    assert fee > 0, "Fee should not be zero"
 
 
 # def test_quote_fee_different_receivers(forked_env, lz_module_contract, dev_deployer):

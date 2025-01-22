@@ -1,5 +1,4 @@
 import time
-import logging
 
 
 class ExecutorOptions:
@@ -148,11 +147,11 @@ def test_executor_options():
         options.hex() == "0003010011010000000000000000000000000000ea60"
     )  # hardcoded value from LZ docs
 
-    logging.debug(f"Default options: 0x{options.hex()}")
+    print(f"Default options: 0x{options.hex()}")
 
     # Test with different gas
     options_100k = build_default_options(100000)
-    logging.debug(f"100k gas options: 0x{options_100k.hex()}")
+    print(f"100k gas options: 0x{options_100k.hex()}")
 
     # Test multiple options
     options = ExecutorOptions.new_options()
@@ -160,15 +159,15 @@ def test_executor_options():
     options = ExecutorOptions.add_native_drop_option(
         options, amount=1000000, receiver=bytes.fromhex("00" * 32)
     )
-    logging.debug(f"Options with native drop: 0x{options.hex()}")
+    print(f"Options with native drop: 0x{options.hex()}")
 
 
 def test_contract_options(lz_module_contract):
     # Test contract options
     options_python = build_default_options(60000)
-    logging.debug(f"Python options: 0x{options_python.hex()}")
+    print(f"Python options: 0x{options_python.hex()}")
     options_contract = lz_module_contract.eval(f"self._build_lz_receive_option({60000})")
-    logging.debug(f"Contract options: 0x{options_contract.hex()}")
+    print(f"Contract options: 0x{options_contract.hex()}")
     assert options_python == options_contract
 
 
@@ -177,8 +176,8 @@ def test_lz_read_options():
     # Test basic read option
     options = ExecutorOptions.new_options()
     options = ExecutorOptions.add_lz_read_option(options, gas=100000, data_size=64)
-    logging.debug("\nLZ Read options (100k gas, 64 bytes):")
-    logging.debug(f"0x{options.hex()}")
+    print("\nLZ Read options (100k gas, 64 bytes):")
+    print(f"0x{options.hex()}")
 
 
 # Compare with contract
@@ -186,8 +185,8 @@ def test_contract_read_options(lz_module_contract):
     options_python = ExecutorOptions.new_options()
     options_python = ExecutorOptions.add_lz_read_option(options_python, gas=100000, data_size=64)
     options_contract = lz_module_contract.eval(f"self._build_lz_read_option({100000}, {64})")
-    logging.debug(f"\nPython read options: 0x{options_python.hex()}")
-    logging.debug(f"Contract read options: 0x{options_contract.hex()}")
+    print(f"\nPython read options: 0x{options_python.hex()}")
+    print(f"Contract read options: 0x{options_contract.hex()}")
     assert options_python == options_contract
 
 
@@ -205,8 +204,8 @@ def test_read_request_encoding():
     }
 
     encoded = ReadCodec.encode_request(request_dict)
-    logging.debug("\nEncoded read request:")
-    logging.debug(f"0x{encoded.hex()}")
+    print("\nEncoded read request:")
+    print(f"0x{encoded.hex()}")
 
 
 # Compare with contract
@@ -232,8 +231,7 @@ def test_contract_request_encoding(lz_module_contract):
     kwargs_str = ", ".join(kwargs)
     argument = f"EVMCallRequestV1({kwargs_str})"
     encoded_contract = lz_module_contract.eval(f"self._encode_read_request({argument})")
-    # encoded_contract = lz_module_contract.eval(f"self._encode_read_request({request_dict})")
 
-    logging.debug(f"\nPython encoded request: 0x{encoded_python.hex()}")
-    logging.debug(f"Contract encoded request: 0x{encoded_contract.hex()}")
+    print(f"\nPython encoded request: 0x{encoded_python.hex()}")
+    print(f"Contract encoded request: 0x{encoded_contract.hex()}")
     assert encoded_python == encoded_contract

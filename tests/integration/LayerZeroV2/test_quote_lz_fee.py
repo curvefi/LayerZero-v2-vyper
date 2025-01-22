@@ -1,5 +1,4 @@
 import boa
-
 from conftest import LZ_ENDPOINT_ID, LZ_ENDPOINT_BASE_SEPOLIA
 
 GAS_LZ_FEE = 500_000

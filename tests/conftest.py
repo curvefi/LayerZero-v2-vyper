@@ -2,9 +2,6 @@ import boa
 import pytest
 import os
 from web3 import Web3
-import logging
-
-logging.basicConfig(level=logging.DEBUG, format="%(message)s")
 
 BOA_CACHE = False
 LZ_ENDPOINT_BASE_SEPOLIA = "0x6EDCE65403992e310A62460808c4b910D972f10f"

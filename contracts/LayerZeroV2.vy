@@ -193,19 +193,24 @@ def _encode_read_request(_request: EVMCallRequestV1) -> Bytes[LZ_MESSAGE_SIZE_CA
     request_size: uint16 = convert(len(_request.callData) + 35, uint16)
 
     # 1. Start with headers
-    encoded_headers: Bytes[13] = concat(
+    # Mimic ReadCmdCodecV1.sol:183
+    encoded_headers_1: Bytes[6] = concat(  # mimics
         convert(CMD_VERSION, bytes2),  # cmd version = 1
         convert(0, bytes2),  # appCmdLabel = 0
-        convert(1, bytes2),  # requests length = 1
+        convert(1, bytes2),  # requests length = 1 (no appends, only single fcn call)
+    )
+    # Now ReadCmdCodecV1.sol:195
+    encoded_headers_2: Bytes[13] = concat(
+        encoded_headers_1,  # 6 bytes
         convert(REQUEST_VERSION, bytes1),  # request version = 1
         convert(_request.appRequestLabel, bytes2),  # request label
         convert(RESOLVER_TYPE, bytes2),  # resolver type = 1
         convert(request_size, bytes2),  # size of what follows
     )
-
     # 2. Add request fields
+    # ReadCmdCodecV1.sol:204
     encoded: Bytes[LZ_MESSAGE_SIZE_CAP] = concat(
-        encoded_headers,  # 13 bytes
+        encoded_headers_2,  # 13 bytes
         convert(_request.targetEid, bytes4),  # +4=17
         convert(_request.isBlockNum, bytes1),  # +1=18
         convert(_request.blockNumOrTimestamp, bytes8),  # +8=26
@@ -325,7 +330,6 @@ def _lz_receive(
     assert self.LZ_PEERS[_origin.srcEid] != empty(address), "Peer not set"
     assert convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid], "Invalid peer"
     return True
-
 
 
 @payable
