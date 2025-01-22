@@ -5,13 +5,13 @@ A Vyper module for LayerZero V2 cross-chain messaging with example implementatio
 ## Overview
 
 This repository contains:
-- `LZv2Module.vy`: Base module for LayerZero V2 messaging
+- `LayerZeroV2.vy`: Base module for LayerZero V2 messaging
 - `ExampleMessenger.vy`: Example implementation for string messaging
 - Tests for module functionality
 
 ## Contracts
 
-### LZv2Module
+### LayerZeroV2
 
 Base module that handles core LayerZero V2 functionality:
 - Message sending with fee management
@@ -62,7 +62,7 @@ Tests cover:
 ### Module Import
 
 ```python
-import LZV2Module as lz
+import LayerZeroV2 as lz
 initializes: lz
 exports: (
     lz.LZ_ENDPOINT,

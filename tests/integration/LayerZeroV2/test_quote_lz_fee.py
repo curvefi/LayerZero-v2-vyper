@@ -2,12 +2,14 @@ import boa
 
 from conftest import LZ_ENDPOINT_ID, LZ_ENDPOINT_BASE_SEPOLIA
 
+GAS_LZ_FEE = 500_000
 
-def test_quote_fee(forked_env, lz_module_contract):
+
+def test_quote_lz_fee(forked_env, lz_module_contract):
     """Test basic quote for default LZ receive option"""
     # Get quote for basic message
     fee = lz_module_contract.eval(
-        f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {lz_module_contract.address}, {b'0'}, {500_000})"
+        f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {lz_module_contract.address}, {b'0'}, {GAS_LZ_FEE})"
     )
     print(f"\nBasic quote fee: {fee}")
 
@@ -16,7 +18,7 @@ def test_quote_fee(forked_env, lz_module_contract):
 
     # now compare with external method
     fee_external = lz_module_contract.quote_lz_fee(
-        LZ_ENDPOINT_ID, lz_module_contract.address, b"0", 500_000
+        LZ_ENDPOINT_ID, lz_module_contract.address, b"0", GAS_LZ_FEE
     )
     assert fee == fee_external, "Fees should match"
 
@@ -25,12 +27,12 @@ def test_quote_fee_different_receivers(forked_env, lz_module_contract, dev_deplo
     """Test quotes with different receiver addresses"""
     # Quote to self
     fee_self = lz_module_contract.eval(
-        f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {lz_module_contract.address}, {b'0'}, {500_000})"
+        f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {lz_module_contract.address}, {b'0'}, {GAS_LZ_FEE})"
     )
 
     # Quote to deployer
     fee_deployer = lz_module_contract.eval(
-        f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {dev_deployer}, {b'0'}, {500_000})"
+        f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {dev_deployer}, {b'0'}, {GAS_LZ_FEE})"
     )
 
     print(f"\nFee to self: {fee_self}")
@@ -45,7 +47,7 @@ def test_quote_fee_revert_case(forked_env, lz_module_contract):
     # Invalid chain ID
     with boa.reverts():
         lz_module_contract.eval(
-            f"self._quote_lz_fee({0}, {lz_module_contract.address}, {b'0'}, {500_000})"
+            f"self._quote_lz_fee({0}, {lz_module_contract.address}, {b'0'}, {GAS_LZ_FEE})"
         )
 
 
@@ -53,7 +55,7 @@ def test_endpoint_interaction(forked_env, lz_module_contract, scan_url, scan_api
     """Compare contract quote with direct endpoint call"""
     # Get quote via contract
     fee_contract = lz_module_contract.eval(
-        f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {lz_module_contract.address}, {b'0'}, {500_000})"
+        f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {lz_module_contract.address}, {b'0'}, {GAS_LZ_FEE})"
     )
 
     print(f"\nContract quote: {fee_contract}")

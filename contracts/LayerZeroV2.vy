@@ -183,6 +183,68 @@ def _build_lz_read_option(
 
 
 @internal
+@pure
+def _encode_read_request(_request: EVMCallRequestV1) -> Bytes[LZ_MESSAGE_SIZE_CAP]:
+    """
+    @notice Encode read request following ReadCmdCodecV1 format
+    @param _request The read request to encode
+    """
+    # Get total request size (calldata + fixed fields = 35 bytes)
+    request_size: uint16 = convert(len(_request.callData) + 35, uint16)
+
+    # 1. Start with headers
+    encoded_headers: Bytes[13] = concat(
+        convert(CMD_VERSION, bytes2),  # cmd version = 1
+        convert(0, bytes2),  # appCmdLabel = 0
+        convert(1, bytes2),  # requests length = 1
+        convert(REQUEST_VERSION, bytes1),  # request version = 1
+        convert(_request.appRequestLabel, bytes2),  # request label
+        convert(RESOLVER_TYPE, bytes2),  # resolver type = 1
+        convert(request_size, bytes2),  # size of what follows
+    )
+
+    # 2. Add request fields
+    encoded: Bytes[LZ_MESSAGE_SIZE_CAP] = concat(
+        encoded_headers,  # 13 bytes
+        convert(_request.targetEid, bytes4),  # +4=17
+        convert(_request.isBlockNum, bytes1),  # +1=18
+        convert(_request.blockNumOrTimestamp, bytes8),  # +8=26
+        convert(_request.confirmations, bytes2),  # +2=28
+        convert(_request.to, bytes20),  # +20=48 (35 without headers)
+        _request.callData,  # +LZ_READ_CALLDATA_SIZE
+    )
+
+    return encoded
+
+
+@internal
+@view
+def _quote_lz_read_fee(
+    _request: EVMCallRequestV1, _gas_limit: uint256 = 0, _data_size: uint32 = 64
+) -> uint256:
+    """
+    @notice Get fee quote for read request
+    @param _request The read request struct
+    @param _gas_limit Optional gas limit (uses default if 0)
+    @param _data_size Expected response size
+    @return Required fee in native currency
+    """
+    gas: uint256 = _gas_limit if _gas_limit != 0 else self.default_gas_limit
+    options: Bytes[64] = self._build_lz_read_option(gas, _data_size)
+    read_cmd: Bytes[LZ_MESSAGE_SIZE_CAP] = self._encode_read_request(_request)
+
+    params: MessagingParams = MessagingParams(
+        dstEid=READ_CHANNEL,
+        receiver=empty(bytes32),
+        message=read_cmd,
+        options=options,
+        payInLzToken=False,
+    )
+    fees: MessagingFee = staticcall ILayerZeroEndpointV2(LZ_ENDPOINT).quote(params, self)
+    return fees.nativeFee
+
+
+@internal
 @view
 def _quote_lz_fee(
     _dstEid: uint32,
@@ -265,67 +327,6 @@ def _lz_receive(
     return True
 
 
-@internal
-@pure
-def _encode_read_request(_request: EVMCallRequestV1) -> Bytes[LZ_MESSAGE_SIZE_CAP]:
-    """
-    @notice Encode read request following ReadCmdCodecV1 format
-    @param _request The read request to encode
-    """
-    # Get total request size (calldata + fixed fields = 35 bytes)
-    request_size: uint16 = convert(len(_request.callData) + 35, uint16)
-
-    # 1. Start with headers
-    encoded_headers: Bytes[13] = concat(
-        convert(CMD_VERSION, bytes2),  # cmd version = 1
-        convert(0, bytes2),  # appCmdLabel = 0
-        convert(1, bytes2),  # requests length = 1
-        convert(REQUEST_VERSION, bytes1),  # request version = 1
-        convert(_request.appRequestLabel, bytes2),  # request label
-        convert(RESOLVER_TYPE, bytes2),  # resolver type = 1
-        convert(request_size, bytes2),  # size of what follows
-    )
-
-    # 2. Add request fields
-    encoded: Bytes[LZ_MESSAGE_SIZE_CAP] = concat(
-        encoded_headers,  # 13 bytes
-        convert(_request.targetEid, bytes4),  # +4=17
-        convert(_request.isBlockNum, bytes1),  # +1=18
-        convert(_request.blockNumOrTimestamp, bytes8),  # +8=26
-        convert(_request.confirmations, bytes2),  # +2=28
-        convert(_request.to, bytes20),  # +20=48 (35 without headers)
-        _request.callData,  # +LZ_READ_CALLDATA_SIZE
-    )
-
-    return encoded
-
-
-@internal
-@view
-def _quote_lz_read_fee(
-    _request: EVMCallRequestV1, _gas_limit: uint256 = 0, _data_size: uint32 = 64
-) -> uint256:
-    """
-    @notice Get fee quote for read request
-    @param _request The read request struct
-    @param _gas_limit Optional gas limit (uses default if 0)
-    @param _data_size Expected response size
-    @return Required fee in native currency
-    """
-    gas: uint256 = _gas_limit if _gas_limit != 0 else self.default_gas_limit
-    options: Bytes[64] = self._build_lz_read_option(gas, _data_size)
-    read_cmd: Bytes[LZ_MESSAGE_SIZE_CAP] = self._encode_read_request(_request)
-
-    params: MessagingParams = MessagingParams(
-        dstEid=READ_CHANNEL,
-        receiver=empty(bytes32),
-        message=read_cmd,
-        options=options,
-        payInLzToken=False,
-    )
-    fees: MessagingFee = staticcall ILayerZeroEndpointV2(LZ_ENDPOINT).quote(params, self)
-    return fees.nativeFee
-
 
 @payable
 @internal
@@ -361,18 +362,6 @@ def _send_read_request(
     extcall ILayerZeroEndpointV2(LZ_ENDPOINT).send(params, msg.sender, value=msg.value)
 
 
-@view
-@external
-def quote_lz_read(
-    _request: EVMCallRequestV1, _gas_limit: uint256 = 0, _data_size: uint32 = 64
-) -> uint256:
-    """
-    @notice External fee quote for read request
-    @return Required fee in native currency
-    """
-    return self._quote_lz_read_fee(_request, _gas_limit, _data_size)
-
-
 ################################################################
 #                     EXPORTED FUNCTIONS                       #
 ################################################################
@@ -391,6 +380,18 @@ def quote_lz_fee(
     @return Required fee in native currency
     """
     return self._quote_lz_fee(_dstEid, _receiver, _message, _gas_limit)
+
+
+@view
+@external
+def quote_lz_read_fee(
+    _request: EVMCallRequestV1, _gas_limit: uint256 = 0, _data_size: uint32 = 64
+) -> uint256:
+    """
+    @notice External fee quote for read request
+    @return Required fee in native currency
+    """
+    return self._quote_lz_read_fee(_request, _gas_limit, _data_size)
 
 
 ################################################################

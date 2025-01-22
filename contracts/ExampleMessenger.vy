@@ -23,7 +23,7 @@ protocol. Includes ownership control for secure peer management and configuratio
 
 
 # Import LayerZero module for cross-chain messaging
-import LZv2Module as lz
+import LayerZeroV2 as lz
 initializes: lz
 exports: (
     lz.LZ_ENDPOINT,
