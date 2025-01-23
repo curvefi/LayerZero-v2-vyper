@@ -6,6 +6,13 @@
 @notice Example implementation of LZ Base module for simple messaging between
 chains. Allows sending and receiving string messages across chains using LayerZero
 protocol. Includes ownership control for secure peer management and configuration.
+
+@license Copyright (c) Curve.Fi, 2020-2025 - all rights reserved
+
+@author curve.fi
+
+@custom:security security@curve.fi
+
 """
 
 ################################################################
@@ -122,6 +129,18 @@ def set_lz_read_channel(_new_channel: uint32):
 #                    MESSAGING FUNCTIONS                       #
 ################################################################
 
+@view
+@external
+def quote_message_fee(
+    _dst_eid: uint32, _receiver: address, _message: String[128], _gas_limit: uint256 = 0
+) -> uint256:
+    """
+    @notice Quote fee for sending message
+    """
+    encoded: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = convert(_message, Bytes[lz.LZ_MESSAGE_SIZE_CAP])
+    return lz._quote_lz_fee(_dst_eid, _receiver, encoded, _gas_limit)
+
+
 @payable
 @external
 def send_message(
@@ -137,6 +156,25 @@ def send_message(
     encoded: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = convert(_message, Bytes[lz.LZ_MESSAGE_SIZE_CAP])
     lz._send_message(_dst_eid, convert(_receiver, bytes32), encoded, _gas_limit)
     log MessageSent(_dst_eid, _message, msg.value)
+
+
+@view
+@external
+def quote_read_fee(
+    _dst_eid: uint32,
+    _target: address,
+    _calldata: Bytes[128],
+    _gas_limit: uint256 = 0,
+    _data_size: uint32 = 64,
+) -> uint256:
+    """
+    @notice Quote fee for read request
+    """
+    message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = lz._prepare_read_message_bytes(
+        _dst_eid, _target, _calldata
+    )
+
+    return lz._quote_lz_fee(lz.LZ_READ_CHANNEL, empty(address), message, _gas_limit, _data_size)
 
 
 @payable
@@ -158,7 +196,7 @@ def request_read(
     """
     # Prepare read message
     message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = lz._prepare_read_message_bytes(
-        _dst_eid, _target, _calldata
+        _dst_eid, _target, _calldata, False, convert(block.timestamp, uint64), 1
     )
 
     # Send to read channel
@@ -198,39 +236,6 @@ def lzReceive(
         log MessageReceived(_origin.srcEid, message)
 
     return True
-
-
-@view
-@external
-def quote_message_fee(
-    _dst_eid: uint32, _receiver: address, _message: String[128], _gas_limit: uint256 = 0
-) -> uint256:
-    """
-    @notice Quote fee for sending message
-    """
-    encoded: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = convert(_message, Bytes[lz.LZ_MESSAGE_SIZE_CAP])
-    return lz._quote_lz_fee(_dst_eid, _receiver, encoded, _gas_limit)
-
-
-@view
-@external
-def quote_read_fee(
-    _dst_eid: uint32,
-    _target: address,
-    _calldata: Bytes[128],
-    _gas_limit: uint256 = 0,
-    _data_size: uint32 = 64,
-) -> uint256:
-    """
-    @notice Quote fee for read request
-    """
-    message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = lz._prepare_read_message_bytes(
-        _dst_eid, _target, _calldata
-    )
-
-    return lz._quote_lz_fee(
-        lz.LZ_READ_CHANNEL, empty(address), message, _gas_limit, _data_size
-    )
 
 
 @view

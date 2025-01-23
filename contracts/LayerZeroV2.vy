@@ -4,12 +4,19 @@
 @title Layer Zero V2 Vyper Module
 
 @notice Base contract for LayerZero cross-chain messaging. Provides core
-functionality for sending messages and read requests across chains.
+functionality for lzSend messages and lzRead.
 
 @dev Core functionality is organized around:
 1. Option building - prepare_message_options and prepare_read_options for different message types
-2. Read request preparation - prepare_read_message for encoding read requests
-3. Unified sending - single _send_message function that works with both types
+2. Read request preparation - prepare_read_message for encoding read requests from calldata
+3. Unified sending - single _send_message function that works with both message types
+
+@license Copyright (c) Curve.Fi, 2020-2025 - all rights reserved
+
+@author curve.fi
+
+@custom:security security@curve.fi
+
 """
 
 ################################################################
@@ -382,6 +389,7 @@ def quote_lz_fee(
     _data_size: uint32 = 0,
 ) -> uint256:
     return self._quote_lz_fee(_dstEid, _receiver, _message, _gas_limit, _data_size)
+
 
 @view
 @external
