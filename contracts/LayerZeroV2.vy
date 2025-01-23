@@ -1,57 +1,41 @@
-# @version ~=0.4
+# pragma version ~=0.4
 
 """
 @title Layer Zero V2 Vyper Module
 
 @notice Base contract for LayerZero cross-chain messaging. Provides core
-functionality for sending and receiving messages across chains.
+functionality for sending messages and read requests across chains.
 
-@dev
-- Handles message sending with proper fee management and security checks.
-- Uses internal functions for core logic that can be called by importing contract.
-- Example lzReceive implementation to be overridden by importing contract.
-- Storage includes peers mapping and default gas settings.
-- Functions:
-  - _send_message: Internal, sends message to destination chain
-  - _quote_lz_fee: Internal, quotes fees for message sending
-  - _lz_receive: Internal base implementation of lzReceive with security checks
-
-@custom:security Always verify peers and endpoints for cross-chain security
+@dev Core functionality is organized around:
+1. Option building - prepare_message_options and prepare_read_options for different message types
+2. Read request preparation - prepare_read_message for encoding read requests
+3. Unified sending - single _send_message function that works with both types
 """
-
 
 ################################################################
 #                           CONSTANTS                          #
 ################################################################
 
-
-# Because vyper does not support dynamic bytes arrays, we need to define a maximum size
-# for the message payload. This shouldn't be set too high (like >10k) to avoid excessive gas costs.
+# Message size limits
 LZ_MESSAGE_SIZE_CAP: public(constant(uint256)) = 512
-LZ_READ_CALLDATA_SIZE: public(
-    constant(uint256)
-) = 256  # Max size for call data in read requests, must be lower than LZ_MESSAGE_SIZE_CAP
+LZ_READ_CALLDATA_SIZE: public(constant(uint256)) = 256
 
-# LayerZero specific constants
+# LayerZero protocol constants
 TYPE_3: constant(bytes2) = 0x0003
 WORKER_ID: constant(bytes1) = 0x01
 OPTION_TYPE_LZRECEIVE: constant(bytes1) = 0x01
 OPTION_TYPE_LZREAD: constant(bytes1) = 0x05
-
-# Read channel related
-READ_CHANNEL: constant(uint32) = 4294967294  # max(uint32)-1
 READ_CHANNEL_THRESHOLD: constant(uint32) = 4294965694  # max(uint32)-1600
 
 # Read codec constants
 CMD_VERSION: constant(uint16) = 1
 REQUEST_VERSION: constant(uint8) = 1
-RESOLVER_TYPE: constant(uint16) = 1  # RESOLVER_TYPE_SINGLE_VIEW_EVM_CALL
+RESOLVER_TYPE: constant(uint16) = 1
 
 
 ################################################################
 #                           STRUCTS                            #
 ################################################################
-
 
 struct MessagingParams:
     dstEid: uint32
@@ -72,7 +56,6 @@ struct Origin:
     nonce: uint64
 
 
-# LZ Read specific struct
 struct EVMCallRequestV1:
     appRequestLabel: uint16
     targetEid: uint32
@@ -87,10 +70,8 @@ struct EVMCallRequestV1:
 #                         INTERFACES                           #
 ################################################################
 
-
 interface ILayerZeroEndpointV2:
     def quote(_params: MessagingParams, _sender: address) -> MessagingFee: view
-
     def send(_params: MessagingParams, _refundAddress: address) -> (
         bytes32, uint64, uint256, uint256
     ): payable
@@ -100,57 +81,56 @@ interface ILayerZeroEndpointV2:
 #                           STORAGE                            #
 ################################################################
 
-
-LZ_ENDPOINT: public(immutable(address))  # LayerZero endpoint address on deployed chain
-LZ_PEERS: public(HashMap[uint32, address])  # Chain ID => Trusted peer address
-default_gas_limit: public(uint256)  # Default gas limit for cross-chain messages
+LZ_ENDPOINT: public(immutable(address))
+LZ_PEERS: public(HashMap[uint32, address])
+LZ_READ_CHANNEL: public(uint32)
+default_gas_limit: public(uint256)
 
 
 ################################################################
 #                         CONSTRUCTOR                          #
 ################################################################
 
-
 @deploy
-def __init__(_endpoint: address, _gas_limit: uint256):
-    """
-    @notice Initialize the LayerZero base module
-    @param _endpoint The LZ endpoint address
-    @param _gas_limit Default gas limit for cross-chain messages
-    """
+def __init__(_endpoint: address, _gas_limit: uint256, _read_channel: uint32):
+    """@notice Initialize with endpoint and default gas limit"""
     LZ_ENDPOINT = _endpoint
-    self.default_gas_limit = _gas_limit
+    self._set_default_gas_limit(_gas_limit)
+    self._set_lz_read_channel(_read_channel)
 
 
 ################################################################
-#                      INTERNAL FUNCTIONS                      #
+#                           SETTERS                            #
 ################################################################
-
-
-@internal
-def _set_default_gas_limit(_gas_limit: uint256):
-    """
-    @notice Update default gas limit for messages
-    @dev Must be guarded by owner check in importing contract
-    """
-    self.default_gas_limit = _gas_limit
-
 
 @internal
 def _set_peer(_srcEid: uint32, _peer: address):
-    """
-    @notice Set trusted peer for given chain ID
-    @dev Must be guarded by owner check in importing contract
-    """
+    """@notice Set trusted peer for chain ID"""
     self.LZ_PEERS[_srcEid] = _peer
 
 
 @internal
+def _set_default_gas_limit(_gas_limit: uint256):
+    """@notice Update default gas limit"""
+    self.default_gas_limit = _gas_limit
+
+
+@internal
+def _set_lz_read_channel(_read_channel: uint32):
+    """@notice Set read channel ID"""
+    self.LZ_READ_CHANNEL = _read_channel
+
+
+################################################################
+#                      OPTION PREPARATION                      #
+################################################################
+
+@internal
 @pure
-def _build_lz_receive_option(_gas: uint256) -> Bytes[32]:
+def _prepare_message_options(_gas: uint256) -> Bytes[64]:
     """
-    @notice Build LayerZero options with specified gas limit
-    @param _gas Gas limit for execution
+    @notice Build options for regular message sending
+    @param _gas Gas limit for execution on destination
     """
     return concat(
         TYPE_3,
@@ -163,12 +143,9 @@ def _build_lz_receive_option(_gas: uint256) -> Bytes[32]:
 
 @internal
 @pure
-def _build_lz_read_option(
-    _gas: uint256,
-    _data_size: uint32,
-) -> Bytes[32]:
+def _prepare_read_options(_gas: uint256, _data_size: uint32) -> Bytes[64]:
     """
-    @notice Build LayerZero read options
+    @notice Build options for read request
     @param _gas Gas limit for execution
     @param _data_size Expected response data size
     """
@@ -182,6 +159,16 @@ def _build_lz_read_option(
     )
 
 
+################################################################
+#                    READ MESSAGE ENCODING                     #
+################################################################
+
+@view
+@internal
+def _is_read_response(_origin: Origin) -> bool:
+    return _origin.srcEid > READ_CHANNEL_THRESHOLD
+
+
 @internal
 @pure
 def _encode_read_request(_request: EVMCallRequestV1) -> Bytes[LZ_MESSAGE_SIZE_CAP]:
@@ -189,91 +176,138 @@ def _encode_read_request(_request: EVMCallRequestV1) -> Bytes[LZ_MESSAGE_SIZE_CA
     @notice Encode read request following ReadCmdCodecV1 format
     @param _request The read request to encode
     """
-    # Get total request size (calldata + fixed fields = 35 bytes)
+    # Calculate request size (35 bytes of fixed fields + calldata)
     request_size: uint16 = convert(len(_request.callData) + 35, uint16)
 
-    # 1. Start with headers
-    # Mimic ReadCmdCodecV1.sol:183
-    encoded_headers_1: Bytes[6] = concat(  # mimics
-        convert(CMD_VERSION, bytes2),  # cmd version = 1
+    # First part of headers (matches ReadCmdCodecV1.sol:183)
+    encoded_headers_1: Bytes[6] = concat(
+        convert(CMD_VERSION, bytes2),  # version = 1
         convert(0, bytes2),  # appCmdLabel = 0
-        convert(1, bytes2),  # requests length = 1 (no appends, only single fcn call)
+        convert(1, bytes2),  # requests length = 1
     )
-    # Now ReadCmdCodecV1.sol:195
+
+    # Complete headers (matches ReadCmdCodecV1.sol:195)
     encoded_headers_2: Bytes[13] = concat(
         encoded_headers_1,  # 6 bytes
-        convert(REQUEST_VERSION, bytes1),  # request version = 1
+        convert(REQUEST_VERSION, bytes1),  # version = 1
         convert(_request.appRequestLabel, bytes2),  # request label
         convert(RESOLVER_TYPE, bytes2),  # resolver type = 1
-        convert(request_size, bytes2),  # size of what follows
+        convert(request_size, bytes2),  # payload size
     )
-    # 2. Add request fields
-    # ReadCmdCodecV1.sol:204
-    encoded: Bytes[LZ_MESSAGE_SIZE_CAP] = concat(
+
+    # Add request fields (matches ReadCmdCodecV1.sol:204)
+    return concat(
         encoded_headers_2,  # 13 bytes
         convert(_request.targetEid, bytes4),  # +4=17
         convert(_request.isBlockNum, bytes1),  # +1=18
         convert(_request.blockNumOrTimestamp, bytes8),  # +8=26
         convert(_request.confirmations, bytes2),  # +2=28
-        convert(_request.to, bytes20),  # +20=48 (35 without headers)
-        _request.callData,  # +LZ_READ_CALLDATA_SIZE
+        convert(_request.to, bytes20),  # +20=48 (35 w/o headers)
+        _request.callData,  # +variable
     )
 
-    return encoded
 
-
+################################################################
+#                       CORE FUNCTIONS                         #
+################################################################
 @internal
 @view
-def _quote_lz_read_fee(
-    _request: EVMCallRequestV1, _gas_limit: uint256 = 0, _data_size: uint32 = 64
-) -> uint256:
+def _prepare_messaging_params(
+    _dstEid: uint32,
+    _receiver: bytes32,
+    _message: Bytes[LZ_MESSAGE_SIZE_CAP],
+    _gas_limit: uint256,
+    _data_size: uint32 = 0,  # Zero indicates regular message, non-zero for read
+) -> MessagingParams:
     """
-    @notice Get fee quote for read request
-    @param _request The read request struct
-    @param _gas_limit Optional gas limit (uses default if 0)
-    @param _data_size Expected response size
-    @return Required fee in native currency
+    @notice Prepare parameters for LayerZero endpoint interactions
+    @dev This function unifies parameter preparation for both sending and quoting.
+    The same structure is needed in both cases since they interact with the same
+    endpoint interface. The data_size parameter determines if we're preparing
+    for a regular message (data_size=0) or a read request (data_size>0).
+
+    @param _dstEid Destination chain ID
+    @param _receiver Target address (empty for reads)
+    @param _message Message payload or encoded read request
+    @param _gas_limit Gas limit for execution
+    @param _data_size For read requests, expected response size
+    @return Prepared parameters for endpoint interaction
     """
     gas: uint256 = _gas_limit if _gas_limit != 0 else self.default_gas_limit
-    options: Bytes[64] = self._build_lz_read_option(gas, _data_size)
-    read_cmd: Bytes[LZ_MESSAGE_SIZE_CAP] = self._encode_read_request(_request)
 
-    params: MessagingParams = MessagingParams(
-        dstEid=READ_CHANNEL,
-        receiver=convert(self, bytes32),
-        message=read_cmd,
-        options=options,
-        payInLzToken=False,
+    # Choose appropriate options based on message type
+    options: Bytes[64] = (
+        self._prepare_read_options(gas, _data_size)
+        if _data_size > 0
+        else self._prepare_message_options(gas)
     )
-    fees: MessagingFee = staticcall ILayerZeroEndpointV2(LZ_ENDPOINT).quote(params, self)
-    return fees.nativeFee
+
+    return MessagingParams(
+        dstEid=_dstEid, receiver=_receiver, message=_message, options=options, payInLzToken=False
+    )
 
 
-@internal
 @view
+@internal
+def _prepare_read_message_bytes(
+    _dst_eid: uint32,
+    _target: address,
+    _calldata: Bytes[LZ_READ_CALLDATA_SIZE],
+    _isBlockNum: bool = False,  # Use timestamp by default
+    _blockNumOrTimestamp: uint64 = 0,  # Uses latest ts (or block!) if 0
+    _confirmations: uint16 = 15,
+) -> Bytes[LZ_MESSAGE_SIZE_CAP]:
+    """
+    @notice Helper to prepare read request message from basic parameters
+    @dev Constructs EVMCallRequestV1, encodes it into message and returns
+    all parameters needed for quote or send. Uses current block timestamp
+    and default confirmations.
+
+    @param _dst_eid Target chain ID to read from
+    @param _target Contract address to read from
+    @param _calldata Function call data
+    @return Parameters for quoting/sending:
+        - destination chain ID (will be READ_CHANNEL)
+        - receiver (empty for reads)
+        - encoded message
+    """
+    # Process block number or timestamp
+    blockNumOrTimestamp: uint64 = _blockNumOrTimestamp
+    if blockNumOrTimestamp == 0:
+        if _isBlockNum:
+            blockNumOrTimestamp = convert(block.number, uint64)
+        else:
+            blockNumOrTimestamp = convert(block.timestamp, uint64)
+
+    # Create read request with sensible defaults
+    request: EVMCallRequestV1 = EVMCallRequestV1(
+        appRequestLabel=1,
+        targetEid=_dst_eid,
+        isBlockNum=_isBlockNum,
+        blockNumOrTimestamp=blockNumOrTimestamp,
+        confirmations=_confirmations,  # Default confirmations
+        to=_target,
+        callData=_calldata,
+    )
+
+    # Encode request into message
+    message: Bytes[LZ_MESSAGE_SIZE_CAP] = self._encode_read_request(request)
+
+    return message
+
+
+@view
+@internal
 def _quote_lz_fee(
     _dstEid: uint32,
     _receiver: address,
     _message: Bytes[LZ_MESSAGE_SIZE_CAP],
     _gas_limit: uint256 = 0,
+    _data_size: uint32 = 0,
 ) -> uint256:
-    """
-    @notice Get fee quote for sending message
-    @param _dstEid Destination chain ID
-    @param _receiver Receiver address on destination
-    @param _message Message payload
-    @param _gas_limit Optional gas limit (uses default if 0)
-    @return Required fee in native currency
-    """
-    gas: uint256 = _gas_limit if _gas_limit != 0 else self.default_gas_limit
-    options: Bytes[64] = self._build_lz_receive_option(gas)
-
-    params: MessagingParams = MessagingParams(
-        dstEid=_dstEid,
-        receiver=convert(convert(_receiver, bytes20), bytes32),
-        message=_message,
-        options=options,
-        payInLzToken=False,
+    """@notice Quote fee using prepared parameters"""
+    params: MessagingParams = self._prepare_messaging_params(
+        _dstEid, convert(_receiver, bytes32), _message, _gas_limit, _data_size
     )
     fees: MessagingFee = staticcall ILayerZeroEndpointV2(LZ_ENDPOINT).quote(params, self)
     return fees.nativeFee
@@ -283,69 +317,22 @@ def _quote_lz_fee(
 @internal
 def _send_message(
     _dstEid: uint32,
-    _receiver: address,
+    _receiver: bytes32,
     _message: Bytes[LZ_MESSAGE_SIZE_CAP],
     _gas_limit: uint256 = 0,
-    _skip_fee_check: bool = False,
+    _data_size: uint32 = 0,
+    _perform_fee_check: bool = False,
 ):
-    """
-    @notice Send message through LayerZero
-    @param _dstEid Destination chain ID
-    @param _receiver Receiver address on destination
-    @param _message Message payload
-    @param _gas_limit Optional gas limit (uses default if 0)
-    """
-    gas: uint256 = _gas_limit if _gas_limit != 0 else self.default_gas_limit
-    options: Bytes[64] = self._build_lz_receive_option(gas)
-
-    params: MessagingParams = MessagingParams(
-        dstEid=_dstEid,
-        receiver=convert(_receiver, bytes32),
-        message=_message,
-        options=options,
-        payInLzToken=False,
+    """@notice Send message using prepared parameters"""
+    params: MessagingParams = self._prepare_messaging_params(
+        _dstEid, _receiver, _message, _gas_limit, _data_size
     )
 
-    if not _skip_fee_check:
+    if _perform_fee_check:
         fees: MessagingFee = staticcall ILayerZeroEndpointV2(LZ_ENDPOINT).quote(params, self)
         assert msg.value >= fees.nativeFee, "Not enough fees"
 
     extcall ILayerZeroEndpointV2(LZ_ENDPOINT).send(params, msg.sender, value=msg.value)
-
-
-@payable
-@internal
-def _send_read_request(
-    _request: EVMCallRequestV1,
-    _gas_limit: uint256 = 0,
-    _data_size: uint32 = 64,
-    _skip_fee_check: bool = False,
-):
-    """
-    @notice Send read request through LayerZero
-    @param _request The read request struct
-    @param _gas_limit Optional gas limit
-    @param _data_size Expected response size
-    @param _skip_fee_check Skip fee amount verification
-    """
-    gas: uint256 = _gas_limit if _gas_limit != 0 else self.default_gas_limit
-    options: Bytes[64] = self._build_lz_read_option(gas, _data_size)
-    read_cmd: Bytes[LZ_MESSAGE_SIZE_CAP] = self._encode_read_request(_request)
-
-    params: MessagingParams = MessagingParams(
-        dstEid=READ_CHANNEL,
-        receiver=convert(self, bytes32),
-        message=read_cmd,
-        options=options,
-        payInLzToken=False,
-    )
-
-    if not _skip_fee_check:
-        fees: MessagingFee = staticcall ILayerZeroEndpointV2(LZ_ENDPOINT).quote(params, self)
-        assert msg.value >= fees.nativeFee, "Not enough fees"
-
-    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).send(params, msg.sender, value=msg.value)
-
 
 
 @payable
@@ -358,17 +345,31 @@ def _lz_receive(
     _extraData: Bytes[64],
 ) -> bool:
     """
-    @notice Base lzReceive with security checks
-    @dev Must be called by importing contract's lzReceive implementation
+    @notice Base security checks for received messages
+    @dev Must be called by importing contract's lzReceive
     """
     assert msg.sender == LZ_ENDPOINT, "Not LZ endpoint"
     assert self.LZ_PEERS[_origin.srcEid] != empty(address), "Peer not set"
     assert convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid], "Invalid peer"
     return True
 
+
 ################################################################
-#                     EXPORTED FUNCTIONS                       #
+#                     EXTERNAL FUNCTIONS                       #
 ################################################################
+@view
+@external
+def prepare_read_message_bytes(
+    _dst_eid: uint32,
+    _target: address,
+    _calldata: Bytes[LZ_READ_CALLDATA_SIZE],
+    _isBlockNum: bool = False,  # Use timestamp by default
+    _blockNumOrTimestamp: uint64 = 0,  # Uses latest ts (or block!) if 0
+    _confirmations: uint16 = 15,
+) -> Bytes[LZ_MESSAGE_SIZE_CAP]:
+    return self._prepare_read_message_bytes(
+        _dst_eid, _target, _calldata, _isBlockNum, _blockNumOrTimestamp, _confirmations
+    )
 
 
 @view
@@ -378,45 +379,19 @@ def quote_lz_fee(
     _receiver: address,
     _message: Bytes[LZ_MESSAGE_SIZE_CAP],
     _gas_limit: uint256 = 0,
+    _data_size: uint32 = 0,
 ) -> uint256:
-    """
-    @notice External fee quote for testing
-    @return Required fee in native currency
-    """
-    return self._quote_lz_fee(_dstEid, _receiver, _message, _gas_limit)
-
-
-@view
-@external
-def quote_lz_read_fee(
-    _request: EVMCallRequestV1, _gas_limit: uint256 = 0, _data_size: uint32 = 64
-) -> uint256:
-    """
-    @notice External fee quote for read request
-    @return Required fee in native currency
-    """
-    return self._quote_lz_read_fee(_request, _gas_limit, _data_size)
-
-
-################################################################
-#                        LZ ENDPOINTS                          #
-################################################################
+    return self._quote_lz_fee(_dstEid, _receiver, _message, _gas_limit, _data_size)
 
 @view
 @external
 def nextNonce(_srcEid: uint32, _sender: bytes32) -> uint64:
-    """
-    @notice Dummy endpoint for protocol needs
-    @dev Returns 0, but can be used to track nonces
-    """
+    """@notice Protocol endpoint for nonce tracking"""
     return 0
 
 
 @view
 @external
 def allowInitializePath(_origin: Origin) -> bool:
-    """
-    @notice Dummy endpoint for protocol needs
-    @dev Returns True, but can be used to verify sender
-    """
+    """@notice Protocol endpoint for path initialization"""
     return True

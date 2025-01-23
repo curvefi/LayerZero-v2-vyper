@@ -2,33 +2,54 @@ import boa
 
 import boa.util
 import boa.util.abi
-from conftest import LZ_ENDPOINT_ID, LZ_READ_CHANNEL
+from conftest import LZ_ENDPOINT_ID
 from vyper.utils import method_id
 
+GAS_LZ_FEE = 500_000
+TEST_CALLDATA = bytes.fromhex("aabbcc")
 
-def test_default_behavior(forked_env, messenger_contract, dev_deployer):
-    """Test lzRead request sending"""
-    # # Setup
-    # source_endpoint = LZ_ENDPOINT_ID
-    # source_address = messenger_contract.address
 
-    # # Set peer for source chain
-    # messenger_contract.set_peer(source_endpoint, source_address, sender=dev_deployer)
-    # Quote the required fee
-    #     def quote_read_fee(
-    #     _dst_eid: uint32,
-    #     _target: address,
-    #     _calldata: Bytes[128],
-    #     _gas_limit: uint256 = 0,
-    #     _data_size: uint32 = 64,
-    # ) -> uint256:
+def test_quote_read_fee(forked_env, messenger_contract):
+    """Test quote for read request"""
+    fee = messenger_contract.quote_read_fee(
+        LZ_ENDPOINT_ID,
+        messenger_contract.address,
+        TEST_CALLDATA,
+        GAS_LZ_FEE,
+        64,  # default response size
+    )
+    print(f"\nRead request quote fee: {fee}")
+    assert fee > 0, "Fee should not be zero"
 
-    source_endpoint = LZ_ENDPOINT_ID
-    source_address = messenger_contract.address
 
-    # Set peer for source chain
-    messenger_contract.set_peer(LZ_READ_CHANNEL, messenger_contract.address, sender=dev_deployer)
+def test_request_read(forked_env, messenger_contract, dev_deployer):
+    """Test sending read request"""
+    # Get quote first
+    fee = messenger_contract.quote_read_fee(
+        LZ_ENDPOINT_ID, messenger_contract.address, TEST_CALLDATA, GAS_LZ_FEE
+    )
+    boa.env.evm.set_balance(dev_deployer, 10**18)  # 1 ETH
 
+    # Send read request
+    _ = messenger_contract.request_read(
+        LZ_ENDPOINT_ID,
+        messenger_contract.address,
+        TEST_CALLDATA,
+        GAS_LZ_FEE,
+        64,
+        value=2 * fee,
+        sender=dev_deployer,
+    )
+
+    # Check event
+    events = messenger_contract.get_logs()
+    assert (
+        f"ReadRequestSent(destination={LZ_ENDPOINT_ID}, target={messenger_contract.address}, payload={TEST_CALLDATA}"
+        in repr(events)
+    )
+
+
+def test_prepare_calldata():
     # prepare calldata (in two ways that match)
     method_str = "dummy_endpoint(uint256)"
     num = 12345
@@ -45,17 +66,3 @@ def tmp()-> Bytes[256]:
     calldata2 = dummy_contract.tmp()
     print(f"Calldata from vyper mock: {calldata2.hex()}")
     assert calldata == calldata2
-    # Quote the required fee
-    required_fee = messenger_contract.quote_read_fee(source_endpoint, source_address, calldata2)
-    print(f"Required fee: {required_fee}")
-    assert required_fee > 0, "Fee should not be zero"
-
-    boa.env.evm.set_balance(dev_deployer, 10**18)  # 1 ETH
-    balance_before = boa.env.evm.get_balance(dev_deployer)
-    assert balance_before == 10**18
-    # Send message with correct fee
-    messenger_contract.request_lzRead(
-        source_endpoint, source_address, calldata2, sender=dev_deployer, value=required_fee * 3
-    )
-    balance_after = boa.env.evm.get_balance(dev_deployer)
-    assert balance_after > balance_before - 3 * required_fee  # assert refund

@@ -166,7 +166,7 @@ def test_contract_options(lz_module_contract):
     # Test contract options
     options_python = build_default_options(60000)
     print(f"Python options: 0x{options_python.hex()}")
-    options_contract = lz_module_contract.eval(f"self._build_lz_receive_option({60000})")
+    options_contract = lz_module_contract.eval(f"self._prepare_message_options({60000})")
     print(f"Contract options: 0x{options_contract.hex()}")
     assert options_python == options_contract
 
@@ -184,7 +184,7 @@ def test_lz_read_options():
 def test_contract_read_options(lz_module_contract):
     options_python = ExecutorOptions.new_options()
     options_python = ExecutorOptions.add_lz_read_option(options_python, gas=100000, data_size=64)
-    options_contract = lz_module_contract.eval(f"self._build_lz_read_option({100000}, {64})")
+    options_contract = lz_module_contract.eval(f"self._prepare_read_options({100000}, {64})")
     print(f"\nPython read options: 0x{options_python.hex()}")
     print(f"Contract read options: 0x{options_contract.hex()}")
     assert options_python == options_contract

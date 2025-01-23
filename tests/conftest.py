@@ -92,7 +92,9 @@ def scan_url():
 @pytest.fixture()
 def lz_module_contract(dev_deployer):
     with boa.env.prank(dev_deployer):
-        return boa.load("contracts/LayerZeroV2.vy", LZ_ENDPOINT_BASE_SEPOLIA, 500_000)
+        return boa.load(
+            "contracts/LayerZeroV2.vy", LZ_ENDPOINT_BASE_SEPOLIA, 500_000, LZ_READ_CHANNEL
+        )
 
 
 @pytest.fixture()

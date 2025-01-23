@@ -6,21 +6,11 @@
 @notice Example implementation of LZ Base module for simple messaging between
 chains. Allows sending and receiving string messages across chains using LayerZero
 protocol. Includes ownership control for secure peer management and configuration.
-
-@dev
-- Uses LZ Base module for core messaging functionality
-- Implements both sending and receiving of string messages
-- Includes ownable_2step for secure management
-- Messages are limited to 128 bytes and converted between string/bytes
-
-@author curve.fi
 """
-
 
 ################################################################
 #                           INTERFACES                         #
 ################################################################
-
 
 # Import LayerZero module for cross-chain messaging
 import LayerZeroV2 as lz
@@ -30,6 +20,7 @@ exports: (
     lz.LZ_PEERS,
     lz.LZ_MESSAGE_SIZE_CAP,
     lz.LZ_READ_CALLDATA_SIZE,
+    lz.LZ_READ_CHANNEL,
     lz.default_gas_limit,
     lz.quote_lz_fee,
     lz.nextNonce,
@@ -50,11 +41,9 @@ exports: (
     ownable_2step.renounce_ownership,
 )
 
-
 ################################################################
 #                            EVENTS                            #
 ################################################################
-
 
 event MessageSent:
     destination: uint32
@@ -82,7 +71,6 @@ event ReadResponseReceived:
 #                          CONSTRUCTOR                         #
 ################################################################
 
-
 @deploy
 def __init__(_endpoint: address, _gas_limit: uint256):
     """
@@ -90,8 +78,7 @@ def __init__(_endpoint: address, _gas_limit: uint256):
     @param _endpoint LayerZero endpoint address
     @param _gas_limit Default gas limit for cross-chain messages
     """
-    # Initialize all modules
-    lz.__init__(_endpoint, _gas_limit)
+    lz.__init__(_endpoint, _gas_limit, 4294967294)
     ownable.__init__()
     ownable_2step.__init__()
 
@@ -99,7 +86,6 @@ def __init__(_endpoint: address, _gas_limit: uint256):
 ################################################################
 #                      OWNER FUNCTIONS                         #
 ################################################################
-
 
 @external
 def set_peer(_srcEid: uint32, _peer: address):
@@ -122,10 +108,19 @@ def set_default_gas(_gas_limit: uint256):
     lz._set_default_gas_limit(_gas_limit)
 
 
+@external
+def set_lz_read_channel(_new_channel: uint32):
+    """
+    @notice Set new read channel for read requests
+    @param _new_channel New read channel ID
+    """
+    ownable._check_owner()
+    lz._set_lz_read_channel(_new_channel)
+
+
 ################################################################
 #                    MESSAGING FUNCTIONS                       #
 ################################################################
-
 
 @payable
 @external
@@ -140,13 +135,13 @@ def send_message(
     @param _gas_limit Optional gas limit override
     """
     encoded: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = convert(_message, Bytes[lz.LZ_MESSAGE_SIZE_CAP])
-    lz._send_message(_dst_eid, _receiver, encoded, _gas_limit)
+    lz._send_message(_dst_eid, convert(_receiver, bytes32), encoded, _gas_limit)
     log MessageSent(_dst_eid, _message, msg.value)
 
 
 @payable
 @external
-def request_lzRead(
+def request_read(
     _dst_eid: uint32,
     _target: address,
     _calldata: Bytes[128],
@@ -161,18 +156,20 @@ def request_lzRead(
     @param _gas_limit Optional gas limit
     @param _data_size Expected response size
     """
-    request: lz.EVMCallRequestV1 = lz.EVMCallRequestV1(
-        appRequestLabel=1,
-        targetEid=_dst_eid,
-        isBlockNum=False,  # Use latest state
-        blockNumOrTimestamp=convert(block.timestamp, uint64),
-        confirmations=1,
-        to=_target,
-        callData=_calldata,
+    # Prepare read message
+    message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = lz._prepare_read_message_bytes(
+        _dst_eid, _target, _calldata
     )
 
-    # Send read request
-    lz._send_read_request(request, _gas_limit, _data_size)
+    # Send to read channel
+    lz._send_message(
+        lz.LZ_READ_CHANNEL,  # Read channel
+        convert(self, bytes32),  # self receiver for reads
+        message,
+        _gas_limit,
+        _data_size,
+    )
+
     log ReadRequestSent(_dst_eid, _target, _calldata)
 
 
@@ -191,7 +188,7 @@ def lzReceive(
     # Verify message source
     assert lz._lz_receive(_origin, _guid, _message, _executor, _extraData)
 
-    if _origin.srcEid > lz.READ_CHANNEL_THRESHOLD:
+    if lz._is_read_response(_origin):
         # Handle read response
         message: String[128] = convert(_message, String[128])
         log ReadResponseReceived(_origin.srcEid, message)
@@ -205,6 +202,18 @@ def lzReceive(
 
 @view
 @external
+def quote_message_fee(
+    _dst_eid: uint32, _receiver: address, _message: String[128], _gas_limit: uint256 = 0
+) -> uint256:
+    """
+    @notice Quote fee for sending message
+    """
+    encoded: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = convert(_message, Bytes[lz.LZ_MESSAGE_SIZE_CAP])
+    return lz._quote_lz_fee(_dst_eid, _receiver, encoded, _gas_limit)
+
+
+@view
+@external
 def quote_read_fee(
     _dst_eid: uint32,
     _target: address,
@@ -214,21 +223,17 @@ def quote_read_fee(
 ) -> uint256:
     """
     @notice Quote fee for read request
-    @dev alternative wrapper that creates EVMCallRequestV1
     """
-    request: lz.EVMCallRequestV1 = lz.EVMCallRequestV1(
-        appRequestLabel=1,
-        targetEid=_dst_eid,
-        isBlockNum=False,
-        blockNumOrTimestamp=convert(block.timestamp, uint64),
-        confirmations=15,
-        to=_target,
-        callData=_calldata,
+    message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = lz._prepare_read_message_bytes(
+        _dst_eid, _target, _calldata
     )
-    return lz._quote_lz_read_fee(request, _gas_limit, _data_size)
+
+    return lz._quote_lz_fee(
+        lz.LZ_READ_CHANNEL, empty(address), message, _gas_limit, _data_size
+    )
 
 
 @view
 @external
 def dummy_endpoint(_input: uint256) -> uint256:
-    return 2*_input
+    return 2 * _input
