@@ -240,7 +240,7 @@ def _quote_lz_read_fee(
 
     params: MessagingParams = MessagingParams(
         dstEid=READ_CHANNEL,
-        receiver=empty(bytes32),
+        receiver=convert(self, bytes32),
         message=read_cmd,
         options=options,
         payInLzToken=False,
@@ -315,25 +315,6 @@ def _send_message(
 
 @payable
 @internal
-def _lz_receive(
-    _origin: Origin,
-    _guid: bytes32,
-    _message: Bytes[LZ_MESSAGE_SIZE_CAP],
-    _executor: address,
-    _extraData: Bytes[64],
-) -> bool:
-    """
-    @notice Base lzReceive with security checks
-    @dev Must be called by importing contract's lzReceive implementation
-    """
-    assert msg.sender == LZ_ENDPOINT, "Not LZ endpoint"
-    assert self.LZ_PEERS[_origin.srcEid] != empty(address), "Peer not set"
-    assert convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid], "Invalid peer"
-    return True
-
-
-@payable
-@internal
 def _send_read_request(
     _request: EVMCallRequestV1,
     _gas_limit: uint256 = 0,
@@ -353,7 +334,7 @@ def _send_read_request(
 
     params: MessagingParams = MessagingParams(
         dstEid=READ_CHANNEL,
-        receiver=empty(bytes32),
+        receiver=convert(self, bytes32),
         message=read_cmd,
         options=options,
         payInLzToken=False,
@@ -365,6 +346,25 @@ def _send_read_request(
 
     extcall ILayerZeroEndpointV2(LZ_ENDPOINT).send(params, msg.sender, value=msg.value)
 
+
+
+@payable
+@internal
+def _lz_receive(
+    _origin: Origin,
+    _guid: bytes32,
+    _message: Bytes[LZ_MESSAGE_SIZE_CAP],
+    _executor: address,
+    _extraData: Bytes[64],
+) -> bool:
+    """
+    @notice Base lzReceive with security checks
+    @dev Must be called by importing contract's lzReceive implementation
+    """
+    assert msg.sender == LZ_ENDPOINT, "Not LZ endpoint"
+    assert self.LZ_PEERS[_origin.srcEid] != empty(address), "Peer not set"
+    assert convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid], "Invalid peer"
+    return True
 
 ################################################################
 #                     EXPORTED FUNCTIONS                       #

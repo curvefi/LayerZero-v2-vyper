@@ -155,7 +155,7 @@ def request_lzRead(
 ):
     """
     @notice Send read request to another chain
-    @param _dst_eid Target chain ID
+    @param _dst_eid Target chain endpoint ID
     @param _target Contract to read from
     @param _calldata Function call data
     @param _gas_limit Optional gas limit
@@ -166,7 +166,7 @@ def request_lzRead(
         targetEid=_dst_eid,
         isBlockNum=False,  # Use latest state
         blockNumOrTimestamp=convert(block.timestamp, uint64),
-        confirmations=15,
+        confirmations=1,
         to=_target,
         callData=_calldata,
     )

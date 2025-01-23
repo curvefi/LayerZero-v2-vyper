@@ -3,11 +3,38 @@ import pytest
 import os
 from web3 import Web3
 
-BOA_CACHE = False
 LZ_ENDPOINT_BASE_SEPOLIA = "0x6EDCE65403992e310A62460808c4b910D972f10f"
 LZ_CHAIN_ID = 84532
 LZ_ENDPOINT_ID = 40245
 LZ_READ_CHANNEL = 4294967294
+
+BOA_CACHE = True
+
+
+@pytest.fixture(autouse=True)
+def better_traces(forked_env, scan_url, scan_api):
+    # contains contracts that are not necessarily called
+    # but appear in the traces
+    contracts = [
+        # "0x6EDCE65403992e310A62460808c4b910D972f10f",
+        # "0xcFB06A2F39FfDeF4dE68bd1Efa7AED07c525855D",
+        # "0x23e7950ED3253Ec45D9FbbbF8Ba30B42d7537f7B",
+        # "0xABCE9415ae2c7DF8C37CbdBa73B6C0630Be02AdA",
+        # "0x6098e96a28E02f27B1e6BD381f870F1C8Bd169d3",
+        # "0xB4171f3d814cd7E2dbacB533ba550EE0DA919406",
+        # "0x8A3D588D9f6AC041476b094f97FF94ec30169d3D",
+        # "0x07F5127dDfc5Dd01F2709d3f37a50E0F6C01d797",
+        # "0xe67DC0bF6241C71a6609108A15b8976cd78c2109",
+        # "0x6098e96a28E02f27B1e6BD381f870F1C8Bd169d3",
+        # "0xB4171f3d814cd7E2dbacB533ba550EE0DA919406",
+        # "0x6EDCE65403992e310A62460808c4b910D972f10f",
+        # "0xcFB06A2F39FfDeF4dE68bd1Efa7AED07c525855D",
+    ]
+    for contract in contracts:
+        try:
+            boa.from_etherscan(contract, uri=scan_url, api_key=scan_api)
+        except Exception as e:
+            print(f"Error fetching contract {contract}: {e}")
 
 
 @pytest.fixture(scope="session")
@@ -47,16 +74,19 @@ def forked_env(rpc_url):
 @pytest.fixture(scope="session")
 def rpc_url():
     return "https://sepolia.base.org"
+    # return "https://sepolia.drpc.org"
 
 
 @pytest.fixture(scope="session")
 def scan_api():
     return os.getenv("BASESCAN_API_KEY")
+    # return os.getenv("ETHERSCAN_API_KEY")
 
 
 @pytest.fixture(scope="session")
 def scan_url():
     return "https://api-sepolia.basescan.org/api"
+    # return "https://api-sepolia.etherscan.io/api"
 
 
 @pytest.fixture()

@@ -2,7 +2,7 @@ import boa
 
 import boa.util
 import boa.util.abi
-from conftest import LZ_ENDPOINT_ID
+from conftest import LZ_ENDPOINT_ID, LZ_READ_CHANNEL
 from vyper.utils import method_id
 
 
@@ -25,6 +25,10 @@ def test_default_behavior(forked_env, messenger_contract, dev_deployer):
 
     source_endpoint = LZ_ENDPOINT_ID
     source_address = messenger_contract.address
+
+    # Set peer for source chain
+    messenger_contract.set_peer(LZ_READ_CHANNEL, messenger_contract.address, sender=dev_deployer)
+
     # prepare calldata (in two ways that match)
     method_str = "dummy_endpoint(uint256)"
     num = 12345
@@ -51,7 +55,7 @@ def tmp()-> Bytes[256]:
     assert balance_before == 10**18
     # Send message with correct fee
     messenger_contract.request_lzRead(
-        source_endpoint, source_address, calldata2, sender=dev_deployer, value=int(0.5 * 10**18)
+        source_endpoint, source_address, calldata2, sender=dev_deployer, value=required_fee * 3
     )
     balance_after = boa.env.evm.get_balance(dev_deployer)
     assert balance_after > balance_before - 3 * required_fee  # assert refund
