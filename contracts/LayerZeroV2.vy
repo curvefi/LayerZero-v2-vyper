@@ -403,3 +403,6 @@ def nextNonce(_srcEid: uint32, _sender: bytes32) -> uint64:
 def allowInitializePath(_origin: Origin) -> bool:
     """@notice Protocol endpoint for path initialization"""
     return True
+
+#todo
+# add setSendLibrary, setReceiveLibrary, setReceiveLibraryTimeout, setConfig, setDelegate, and related functions
