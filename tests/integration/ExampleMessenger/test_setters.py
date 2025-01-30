@@ -17,3 +17,7 @@ def test_owner_functions(forked_env, messenger_contract, dev_deployer):
         # Test setting read channel
         new_channel = 12345
         messenger_contract.set_lz_read_channel(new_channel)
+
+        # Test setting delegate
+        messenger_contract.set_lz_delegate(dev_deployer)
+        assert messenger_contract.LZ_DELEGATE() == dev_deployer

@@ -25,6 +25,7 @@ initializes: lz
 exports: (
     lz.LZ_ENDPOINT,
     lz.LZ_PEERS,
+    lz.LZ_DELEGATE,
     lz.LZ_MESSAGE_SIZE_CAP,
     lz.LZ_READ_CALLDATA_SIZE,
     lz.LZ_READ_CHANNEL,
@@ -86,6 +87,7 @@ def __init__(_endpoint: address, _gas_limit: uint256):
     @param _gas_limit Default gas limit for cross-chain messages
     """
     lz.__init__(_endpoint, _gas_limit, 4294967294)
+    lz._set_delegate(msg.sender)
     ownable.__init__()
     ownable_2step.__init__()
 
@@ -124,6 +126,11 @@ def set_lz_read_channel(_new_channel: uint32):
     ownable._check_owner()
     lz._set_lz_read_channel(_new_channel)
 
+
+@external
+def set_lz_delegate(_delegate: address):
+    ownable._check_owner()
+    lz._set_delegate(_delegate)
 
 ################################################################
 #                    MESSAGING FUNCTIONS                       #

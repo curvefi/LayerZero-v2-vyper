@@ -20,6 +20,18 @@ functionality for lzSend messages and lzRead.
 """
 
 ################################################################
+#                         INTERFACES                           #
+################################################################
+
+interface ILayerZeroEndpointV2:
+    def quote(_params: MessagingParams, _sender: address) -> MessagingFee: view
+    def send(_params: MessagingParams, _refundAddress: address) -> (
+        bytes32, uint64, uint256, uint256
+    ): payable
+    def setDelegate(_delegate: address): nonpayable
+
+
+################################################################
 #                           CONSTANTS                          #
 ################################################################
 
@@ -41,6 +53,17 @@ RESOLVER_TYPE: constant(uint16) = 1
 
 
 ################################################################
+#                           STORAGE                            #
+################################################################
+
+LZ_ENDPOINT: public(immutable(address))
+LZ_PEERS: public(HashMap[uint32, address])
+LZ_READ_CHANNEL: public(uint32)
+LZ_DELEGATE: public(address)
+default_gas_limit: public(uint256)
+
+
+################################################################
 #                           STRUCTS                            #
 ################################################################
 
@@ -51,17 +74,14 @@ struct MessagingParams:
     options: Bytes[64]
     payInLzToken: bool
 
-
 struct MessagingFee:
     nativeFee: uint256
     lzTokenFee: uint256
-
 
 struct Origin:
     srcEid: uint32
     sender: bytes32
     nonce: uint64
-
 
 struct EVMCallRequestV1:
     appRequestLabel: uint16
@@ -71,27 +91,6 @@ struct EVMCallRequestV1:
     confirmations: uint16
     to: address
     callData: Bytes[LZ_READ_CALLDATA_SIZE]
-
-
-################################################################
-#                         INTERFACES                           #
-################################################################
-
-interface ILayerZeroEndpointV2:
-    def quote(_params: MessagingParams, _sender: address) -> MessagingFee: view
-    def send(_params: MessagingParams, _refundAddress: address) -> (
-        bytes32, uint64, uint256, uint256
-    ): payable
-
-
-################################################################
-#                           STORAGE                            #
-################################################################
-
-LZ_ENDPOINT: public(immutable(address))
-LZ_PEERS: public(HashMap[uint32, address])
-LZ_READ_CHANNEL: public(uint32)
-default_gas_limit: public(uint256)
 
 
 ################################################################
@@ -107,8 +106,11 @@ def __init__(_endpoint: address, _gas_limit: uint256, _read_channel: uint32):
 
 
 ################################################################
-#                           SETTERS                            #
+#                   SETTERS [GUARD THESE!]                     #
 ################################################################
+# Below is safety-critical functionality that must be handled with care!
+# Exposing these functions without ownership check will lead to anyone
+# being able to bridge any message/command (=loss of funds).
 
 @internal
 def _set_peer(_srcEid: uint32, _peer: address):
@@ -126,6 +128,13 @@ def _set_default_gas_limit(_gas_limit: uint256):
 def _set_lz_read_channel(_read_channel: uint32):
     """@notice Set read channel ID"""
     self.LZ_READ_CHANNEL = _read_channel
+
+
+@internal
+def _set_delegate(_delegate: address):
+    """@notice Set delegate that can change any LZ setting"""
+    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setDelegate(_delegate)
+    self.LZ_DELEGATE = _delegate
 
 
 ################################################################
@@ -164,7 +173,6 @@ def _prepare_read_options(_gas: uint256, _data_size: uint32) -> Bytes[64]:
         convert(convert(_gas, uint128), bytes16),  # gas
         convert(_data_size, bytes4),  # data size
     )
-
 
 ################################################################
 #                    READ MESSAGE ENCODING                     #
@@ -356,8 +364,8 @@ def _lz_receive(
     @dev Must be called by importing contract's lzReceive
     """
     assert msg.sender == LZ_ENDPOINT, "Not LZ endpoint"
-    assert self.LZ_PEERS[_origin.srcEid] != empty(address), "Peer not set"
-    assert convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid], "Invalid peer"
+    assert self.LZ_PEERS[_origin.srcEid] != empty(address), "LZ Peer not set"
+    assert convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid], "Invalid LZ message source!"
     return True
 
 
