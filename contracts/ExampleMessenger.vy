@@ -128,6 +128,28 @@ def set_lz_read_channel(_new_channel: uint32):
 
 
 @external
+def set_lz_send_lib(_channel: uint32, _lib: address):
+    """
+    @notice Set new send library for send requests
+    @param _channel Send channel ID
+    @param _lib New send library address
+    """
+    ownable._check_owner()
+    lz._set_send_lib(_channel, _lib)
+
+
+@external
+def set_lz_receive_lib(_channel: uint32, _lib: address):
+    """
+    @notice Set new receive library for receive requests
+    @param _channel Receive channel ID
+    @param _lib New receive library address
+    """
+    ownable._check_owner()
+    lz._set_receive_lib(_channel, _lib)
+
+
+@external
 def set_lz_delegate(_delegate: address):
     ownable._check_owner()
     lz._set_delegate(_delegate)

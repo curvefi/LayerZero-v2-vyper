@@ -21,3 +21,17 @@ def test_owner_functions(forked_env, messenger_contract, dev_deployer):
         # Test setting delegate
         messenger_contract.set_lz_delegate(dev_deployer)
         assert messenger_contract.LZ_DELEGATE() == dev_deployer
+
+
+def test_set_libs(forked_env, messenger_contract, dev_deployer):
+    SEND_LIB = "0xC1868e054425D378095A003EcbA3823a5D0135C9"
+    RECEIVE_LIB = "0x12523de19dc41c91F7d2093E0CFbB76b17012C8d"
+    READ_LIB = "0x29270F0CFC54432181C853Cd25E2Fb60A68E03f2"
+
+    with boa.env.prank(dev_deployer):
+        # Test setting libraries
+        messenger_contract.set_lz_send_lib(LZ_ENDPOINT_ID, SEND_LIB)
+        messenger_contract.set_lz_receive_lib(LZ_ENDPOINT_ID, RECEIVE_LIB)
+        read_channel = messenger_contract.LZ_READ_CHANNEL()
+        print(f"\nRead channel: {read_channel}")
+        messenger_contract.set_lz_send_lib(read_channel, READ_LIB)

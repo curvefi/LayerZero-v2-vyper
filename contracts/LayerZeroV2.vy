@@ -29,7 +29,8 @@ interface ILayerZeroEndpointV2:
         bytes32, uint64, uint256, uint256
     ): payable
     def setDelegate(_delegate: address): nonpayable
-
+    def setSendLibrary(_oapp: address, _eid: uint32, _newLib: address): nonpayable
+    def setReceiveLibrary(_oapp: address, _eid: uint32, _newLib: address, _gracePeriod: uint256): nonpayable
 
 ################################################################
 #                           CONSTANTS                          #
@@ -135,6 +136,18 @@ def _set_delegate(_delegate: address):
     """@notice Set delegate that can change any LZ setting"""
     extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setDelegate(_delegate)
     self.LZ_DELEGATE = _delegate
+
+
+@internal
+def _set_send_lib(_eid: uint32, _lib: address):
+    """@notice Set new send library for send requests"""
+    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setSendLibrary(self, _eid, _lib)
+
+
+@internal
+def _set_receive_lib(_eid: uint32, _lib: address):
+    """@notice Set new receive library for receive requests"""
+    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setReceiveLibrary(self, _eid, _lib, 0)
 
 
 ################################################################
