@@ -54,3 +54,5 @@ venv.bak/
 
 # compiled contract
 tmp.json
+
+*lz_deployments.json
