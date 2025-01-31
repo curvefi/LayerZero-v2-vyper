@@ -86,7 +86,7 @@ def __init__(_endpoint: address, _gas_limit: uint256):
     @param _endpoint LayerZero endpoint address
     @param _gas_limit Default gas limit for cross-chain messages
     """
-    lz.__init__(_endpoint, _gas_limit, 4294967294)
+    lz.__init__(_endpoint, _gas_limit, 4294967295)
     lz._set_delegate(msg.sender)
     ownable.__init__()
     ownable_2step.__init__()
