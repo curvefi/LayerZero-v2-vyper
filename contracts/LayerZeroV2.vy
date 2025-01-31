@@ -31,7 +31,7 @@ interface ILayerZeroEndpointV2:
     def setDelegate(_delegate: address): nonpayable
     def setSendLibrary(_oapp: address, _eid: uint32, _newLib: address): nonpayable
     def setReceiveLibrary(_oapp: address, _eid: uint32, _newLib: address, _gracePeriod: uint256): nonpayable
-    def setConfig(_oapp: address, _lib: address, _params: SetConfigParam[10]): nonpayable
+    def setConfig(_oapp: address, _lib: address, _params: DynArray[SetConfigParam, 10]): nonpayable
 
 
 ################################################################
@@ -98,7 +98,7 @@ struct EVMCallRequestV1:
 struct SetConfigParam:
     eid: uint32
     configType: uint32
-    config: Bytes[512] # 10+10 addresses = 400bytes
+    config: Bytes[1024]
 
 struct ULNConfig:
     confirmations: uint64
@@ -166,7 +166,7 @@ def _set_receive_lib(_eid: uint32, _lib: address):
 
 @internal
 def _set_uln_config(
-    _remote_eid: uint32,
+    _eid: uint32,
     _oapp: address,
     _lib: address,
     _config_type: uint32,
@@ -180,16 +180,18 @@ def _set_uln_config(
     @dev Arrays must be sorted in ascending order with no duplicates, or lz will fail
     """
 
-    config: ULNConfig = self.prepare_uln_config(
+    config_param: SetConfigParam = self._prepare_uln_config(
+        _eid,
         _config_type,
         _confirmations,
         _required_dvns,
         _optional_dvns,
         _optional_dvn_threshold
     )
-
+    config_param_array: DynArray[SetConfigParam, 10] = empty(DynArray[SetConfigParam, 10])
+    config_param_array[0] = config_param
     # Call endpoint to set config
-    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setConfig(_oapp, _lib, config)
+    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setConfig(_oapp, _lib, config_param_array)
 
 
 ################################################################
@@ -233,12 +235,13 @@ def _prepare_read_options(_gas: uint256, _data_size: uint32) -> Bytes[64]:
 @internal
 @pure
 def _prepare_uln_config(
+    _eid: uint32,
     _config_type: uint32,
     _confirmations: uint64,
     _required_dvns: DynArray[address, 10],
     _optional_dvns: DynArray[address, 10],
     _optional_dvn_threshold: uint8,
-) -> ULNConfig:
+) -> SetConfigParam:
     """
     @notice Prepare ULN config from arrays, automatically calculating counts
     @param _confirmations Number of confirmations required
