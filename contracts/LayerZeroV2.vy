@@ -31,6 +31,8 @@ interface ILayerZeroEndpointV2:
     def setDelegate(_delegate: address): nonpayable
     def setSendLibrary(_oapp: address, _eid: uint32, _newLib: address): nonpayable
     def setReceiveLibrary(_oapp: address, _eid: uint32, _newLib: address, _gracePeriod: uint256): nonpayable
+    def setConfig(_oapp: address, _lib: address, _params: SetConfigParam[10]): nonpayable
+
 
 ################################################################
 #                           CONSTANTS                          #
@@ -93,6 +95,18 @@ struct EVMCallRequestV1:
     to: address
     callData: Bytes[LZ_READ_CALLDATA_SIZE]
 
+struct SetConfigParam:
+    eid: uint32
+    configType: uint32
+    config: Bytes[512] # 10+10 addresses = 400bytes
+
+struct ULNConfig:
+    confirmations: uint64
+    required_dvn_count: uint8
+    optional_dvn_count: uint8
+    optional_dvn_threshold: uint8
+    required_dvns: DynArray[address, 10]  # Max 10 DVNs
+    optional_dvns: DynArray[address, 10]  # Max 10 DVNs
 
 ################################################################
 #                         CONSTRUCTOR                          #
@@ -150,6 +164,34 @@ def _set_receive_lib(_eid: uint32, _lib: address):
     extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setReceiveLibrary(self, _eid, _lib, 0)
 
 
+@internal
+def _set_uln_config(
+    _remote_eid: uint32,
+    _oapp: address,
+    _lib: address,
+    _config_type: uint32,
+    _confirmations: uint64,
+    _required_dvns: DynArray[address, 10],
+    _optional_dvns: DynArray[address, 10],
+    _optional_dvn_threshold: uint8
+):
+    """
+    @notice Set ULN config for remote endpoint
+    @dev Arrays must be sorted in ascending order with no duplicates, or lz will fail
+    """
+
+    config: ULNConfig = self.prepare_uln_config(
+        _config_type,
+        _confirmations,
+        _required_dvns,
+        _optional_dvns,
+        _optional_dvn_threshold
+    )
+
+    # Call endpoint to set config
+    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setConfig(_oapp, _lib, config)
+
+
 ################################################################
 #                      OPTION PREPARATION                      #
 ################################################################
@@ -186,6 +228,44 @@ def _prepare_read_options(_gas: uint256, _data_size: uint32) -> Bytes[64]:
         convert(convert(_gas, uint128), bytes16),  # gas
         convert(_data_size, bytes4),  # data size
     )
+
+
+@internal
+@pure
+def _prepare_uln_config(
+    _config_type: uint32,
+    _confirmations: uint64,
+    _required_dvns: DynArray[address, 10],
+    _optional_dvns: DynArray[address, 10],
+    _optional_dvn_threshold: uint8,
+) -> ULNConfig:
+    """
+    @notice Prepare ULN config from arrays, automatically calculating counts
+    @param _confirmations Number of confirmations required
+    @param _required_dvns Array of required DVN addresses
+    @param _optional_dvns Array of optional DVN addresses
+    @param _optional_dvn_threshold Threshold for optional DVNs
+    """
+    required_count: uint8 = convert(len(_required_dvns), uint8)
+    optional_count: uint8 = convert(len(_optional_dvns), uint8)
+
+    assert _optional_dvn_threshold <= optional_count, "Invalid threshold"
+
+    uln_config: ULNConfig = ULNConfig(
+        confirmations = _confirmations,
+        required_dvn_count = required_count,
+        optional_dvn_count = optional_count,
+        optional_dvn_threshold = _optional_dvn_threshold,
+        required_dvns = _required_dvns,
+        optional_dvns = _optional_dvns
+    )
+
+    return SetConfigParam(
+        eid = _eid,
+        configType = _config_type,
+        config = abi_encode(uln_config)
+    )
+
 
 ################################################################
 #                    READ MESSAGE ENCODING                     #
