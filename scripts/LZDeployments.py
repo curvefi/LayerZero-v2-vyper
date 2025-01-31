@@ -90,10 +90,19 @@ class LZDeployments:
                 for addr, data in network_data["dvns"].items()
                 if not data.get("deprecated", False) and data.get("version", 0) >= 2
             }
+            # Transform DVNs into lists
+            dvns_list = [{"address": addr, **data} for addr, data in active_dvns.items()]
+
+            dvns_lzread = [
+                {"address": addr, **data}
+                for addr, data in active_dvns.items()
+                if data.get("lzReadCompatible", False)
+            ]
 
             return {
                 "metadata": deployment_addresses,
-                "dvns": active_dvns,
+                "dvns": dvns_list,
+                "dvns_lzread": dvns_lzread,
                 "chainDetails": network_data["chainDetails"],
             }
 
