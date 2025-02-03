@@ -35,3 +35,28 @@ def test_set_libs(forked_env, messenger_contract, dev_deployer):
         read_channel = messenger_contract.LZ_READ_CHANNEL()
         print(f"\nRead channel: {read_channel}")
         messenger_contract.set_lz_send_lib(read_channel, READ_LIB)
+
+
+def test_set_uln(forked_env, messenger_contract, dev_deployer):
+    SEND_LIB = "0xC1868e054425D378095A003EcbA3823a5D0135C9"
+    # RECEIVE_LIB = "0x12523de19dc41c91F7d2093E0CFbB76b17012C8d"
+    # READ_LIB = "0x29270F0CFC54432181C853Cd25E2Fb60A68E03f2"
+    # CONFIG_TYPE_READ_LID_CONFIG = 1
+    CONFIG_TYPE_ULN = 2
+    dvns = [
+        "0xbf6ff58f60606edb2f190769b951d825bcb214e2",
+        "0xd9222cc3ccd1df7c070d700ea377d4ada2b86eb5",
+        "0xdf04abb599c7b37dd5ffc0f8e94f6898120874ef",
+        "0xe1a12515f9ab2764b887bf60b923ca494ebbb2d6",
+    ]
+    with boa.env.prank(dev_deployer):
+        messenger_contract.set_lz_uln_config(
+            LZ_ENDPOINT_ID,
+            messenger_contract.address,
+            SEND_LIB,
+            CONFIG_TYPE_ULN,
+            1,  # confirmations
+            [dvns[0]],
+            [],
+            0,  # optional threshold
+        )

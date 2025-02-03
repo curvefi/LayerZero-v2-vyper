@@ -30,8 +30,10 @@ interface ILayerZeroEndpointV2:
     ): payable
     def setDelegate(_delegate: address): nonpayable
     def setSendLibrary(_oapp: address, _eid: uint32, _newLib: address): nonpayable
-    def setReceiveLibrary(_oapp: address, _eid: uint32, _newLib: address, _gracePeriod: uint256): nonpayable
-    def setConfig(_oapp: address, _lib: address, _params: DynArray[SetConfigParam, 10]): nonpayable
+    def setReceiveLibrary(
+        _oapp: address, _eid: uint32, _newLib: address, _gracePeriod: uint256
+    ): nonpayable
+    def setConfig(_oapp: address, _lib: address, _params: DynArray[SetConfigParam, 1]): nonpayable
 
 
 ################################################################
@@ -77,14 +79,17 @@ struct MessagingParams:
     options: Bytes[64]
     payInLzToken: bool
 
+
 struct MessagingFee:
     nativeFee: uint256
     lzTokenFee: uint256
+
 
 struct Origin:
     srcEid: uint32
     sender: bytes32
     nonce: uint64
+
 
 struct EVMCallRequestV1:
     appRequestLabel: uint16
@@ -95,10 +100,12 @@ struct EVMCallRequestV1:
     to: address
     callData: Bytes[LZ_READ_CALLDATA_SIZE]
 
+
 struct SetConfigParam:
     eid: uint32
     configType: uint32
     config: Bytes[1024]
+
 
 struct ULNConfig:
     confirmations: uint64
@@ -107,6 +114,7 @@ struct ULNConfig:
     optional_dvn_threshold: uint8
     required_dvns: DynArray[address, 10]  # Max 10 DVNs
     optional_dvns: DynArray[address, 10]  # Max 10 DVNs
+
 
 ################################################################
 #                         CONSTRUCTOR                          #
@@ -173,7 +181,7 @@ def _set_uln_config(
     _confirmations: uint64,
     _required_dvns: DynArray[address, 10],
     _optional_dvns: DynArray[address, 10],
-    _optional_dvn_threshold: uint8
+    _optional_dvn_threshold: uint8,
 ):
     """
     @notice Set ULN config for remote endpoint
@@ -181,17 +189,11 @@ def _set_uln_config(
     """
 
     config_param: SetConfigParam = self._prepare_uln_config(
-        _eid,
-        _config_type,
-        _confirmations,
-        _required_dvns,
-        _optional_dvns,
-        _optional_dvn_threshold
+        _eid, _config_type, _confirmations, _required_dvns, _optional_dvns, _optional_dvn_threshold
     )
-    config_param_array: DynArray[SetConfigParam, 10] = empty(DynArray[SetConfigParam, 10])
-    config_param_array[0] = config_param
+
     # Call endpoint to set config
-    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setConfig(_oapp, _lib, config_param_array)
+    extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setConfig(_oapp, _lib, [config_param])
 
 
 ################################################################
@@ -255,19 +257,15 @@ def _prepare_uln_config(
     assert _optional_dvn_threshold <= optional_count, "Invalid threshold"
 
     uln_config: ULNConfig = ULNConfig(
-        confirmations = _confirmations,
-        required_dvn_count = required_count,
-        optional_dvn_count = optional_count,
-        optional_dvn_threshold = _optional_dvn_threshold,
-        required_dvns = _required_dvns,
-        optional_dvns = _optional_dvns
+        confirmations=_confirmations,
+        required_dvn_count=required_count,
+        optional_dvn_count=optional_count,
+        optional_dvn_threshold=_optional_dvn_threshold,
+        required_dvns=_required_dvns,
+        optional_dvns=_optional_dvns,
     )
 
-    return SetConfigParam(
-        eid = _eid,
-        configType = _config_type,
-        config = abi_encode(uln_config)
-    )
+    return SetConfigParam(eid=_eid, configType=_config_type, config=abi_encode(uln_config))
 
 
 ################################################################
@@ -461,7 +459,9 @@ def _lz_receive(
     """
     assert msg.sender == LZ_ENDPOINT, "Not LZ endpoint"
     assert self.LZ_PEERS[_origin.srcEid] != empty(address), "LZ Peer not set"
-    assert convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid], "Invalid LZ message source!"
+    assert (
+        convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid]
+    ), "Invalid LZ message source!"
     return True
 
 
@@ -507,6 +507,7 @@ def nextNonce(_srcEid: uint32, _sender: bytes32) -> uint64:
 def allowInitializePath(_origin: Origin) -> bool:
     """@notice Protocol endpoint for path initialization"""
     return True
+
 
 #todo
 # add setSendLibrary, setReceiveLibrary, setReceiveLibraryTimeout, setConfig, setDelegate, and related functions

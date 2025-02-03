@@ -151,8 +151,48 @@ def set_lz_receive_lib(_channel: uint32, _lib: address):
 
 @external
 def set_lz_delegate(_delegate: address):
+    """
+    @notice Set new delegate for LayerZero operations
+    @param _delegate New delegate address
+    """
     ownable._check_owner()
     lz._set_delegate(_delegate)
+
+
+@external
+def set_lz_uln_config(
+    _eid: uint32,
+    _oapp: address,
+    _lib: address,
+    _config_type: uint32,
+    _confirmations: uint64,
+    _required_dvns: DynArray[address, 10],
+    _optional_dvns: DynArray[address, 10],
+    _optional_dvn_threshold: uint8,
+):
+    """
+    @notice Set new ULN configuration for cross-chain messages
+    @param _eid Endpoint ID
+    @param _oapp Originating application address
+    @param _lib Library address
+    @param _config_type Configuration type
+    @param _confirmations Number of confirmations required
+    @param _required_dvns List of required DVN addresses
+    @param _optional_dvns List of optional DVN addresses
+    @param _optional_dvn_threshold Optional DVN threshold
+    """
+    ownable._check_owner()
+    lz._set_uln_config(
+        _eid,
+        _oapp,
+        _lib,
+        _config_type,
+        _confirmations,
+        _required_dvns,
+        _optional_dvns,
+        _optional_dvn_threshold,
+    )
+
 
 ################################################################
 #                    MESSAGING FUNCTIONS                       #

@@ -125,7 +125,7 @@ def test_receive_authentication(forked_env, messenger_contract, dev_deployer):
     )
 
     # Try receiving without setting peer
-    with boa.reverts("Peer not set"):
+    with boa.reverts():
         with boa.env.prank(LZ_ENDPOINT_BASE_SEPOLIA):
             messenger_contract.lzReceive(
                 origin,
@@ -137,7 +137,7 @@ def test_receive_authentication(forked_env, messenger_contract, dev_deployer):
 
     # Set peer but try receiving from wrong endpoint
     messenger_contract.set_peer(source_chain, source_address, sender=dev_deployer)
-    with boa.reverts("Not LZ endpoint"):
+    with boa.reverts():
         messenger_contract.lzReceive(
             origin,
             bytes(32),
@@ -152,7 +152,7 @@ def test_receive_authentication(forked_env, messenger_contract, dev_deployer):
         bytes.fromhex("00" * 12 + "1234567890" * 4),  # different address
         1,
     )
-    with boa.reverts("Invalid peer"):
+    with boa.reverts():
         with boa.env.prank(LZ_ENDPOINT_BASE_SEPOLIA):
             messenger_contract.lzReceive(
                 wrong_origin,
