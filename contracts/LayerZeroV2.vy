@@ -115,6 +115,14 @@ struct ULNConfig:
     required_dvns: DynArray[address, 10]  # Max 10 DVNs
     optional_dvns: DynArray[address, 10]  # Max 10 DVNs
 
+struct ULNReadConfig:
+    executor: address
+    required_dvn_count: uint8
+    optional_dvn_count: uint8
+    optional_dvn_threshold: uint8
+    required_dvns: DynArray[address, 10]  # Max 10 DVNs
+    optional_dvns: DynArray[address, 10]  # Max 10 DVNs
+
 
 ################################################################
 #                         CONSTRUCTOR                          #
@@ -254,18 +262,29 @@ def _prepare_uln_config(
     required_count: uint8 = convert(len(_required_dvns), uint8)
     optional_count: uint8 = convert(len(_optional_dvns), uint8)
 
-    assert _optional_dvn_threshold <= optional_count, "Invalid threshold"
+    assert _optional_dvn_threshold <= optional_count, "Invalid DVN threshold"
 
-    uln_config: ULNConfig = ULNConfig(
-        confirmations=_confirmations,
-        required_dvn_count=required_count,
-        optional_dvn_count=optional_count,
-        optional_dvn_threshold=_optional_dvn_threshold,
-        required_dvns=_required_dvns,
-        optional_dvns=_optional_dvns,
-    )
+    if _config_type == 1 and _eid > READ_CHANNEL_THRESHOLD: # read config
+        uln_config: ULNReadConfig = ULNReadConfig(
+            executor=empty(address), # default executor
+            required_dvn_count=required_count,
+            optional_dvn_count=optional_count,
+            optional_dvn_threshold=_optional_dvn_threshold,
+            required_dvns=_required_dvns,
+            optional_dvns=_optional_dvns,
+        )
+        return SetConfigParam(eid=_eid, configType=_config_type, config=abi_encode(uln_config))
+    else:
+        uln_config: ULNConfig = ULNConfig(
+            confirmations=_confirmations,
+            required_dvn_count=required_count,
+            optional_dvn_count=optional_count,
+            optional_dvn_threshold=_optional_dvn_threshold,
+            required_dvns=_required_dvns,
+            optional_dvns=_optional_dvns,
+        )
+        return SetConfigParam(eid=_eid, configType=_config_type, config=abi_encode(uln_config))
 
-    return SetConfigParam(eid=_eid, configType=_config_type, config=abi_encode(uln_config))
 
 
 ################################################################
