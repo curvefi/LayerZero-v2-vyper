@@ -202,13 +202,15 @@ def set_lz_uln_config(
 
 
 @external
-def withdraw_eth(_amount: uint256):
+def withdraw_eth(_amount: uint256 = 0):
     """
     @notice Withdraw ETH from contract
     @param _amount Amount to withdraw
     """
 
     ownable._check_owner()
+    if _amount == 0:
+        _amount = self.balance
     assert self.balance >= _amount, "Insufficient balance"
     send(msg.sender, _amount)
 
