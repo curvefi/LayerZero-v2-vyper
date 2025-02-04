@@ -39,28 +39,12 @@ def test_quote_read_message(forked_env, lz_module_contract):
         lz_module_contract.address,  # receiver is self
         message,
         GAS_LZ_FEE,
+        0,
         128,  # Expected response size
     )
 
     print(f"\nRead message quote fee: {fee}")
     assert fee > 0, "Fee should not be zero"
-
-
-# def test_quote_fee_different_receivers(forked_env, lz_module_contract, dev_deployer):
-#     """Test quotes with different receiver addresses"""
-#     # Quote to self
-#     fee_self = lz_module_contract.quote_lz_fee(
-#         LZ_ENDPOINT_ID, lz_module_contract.address, b"0", GAS_LZ_FEE
-#     )
-
-#     # Quote to deployer
-#     fee_deployer = lz_module_contract.quote_lz_fee(LZ_ENDPOINT_ID, dev_deployer, b"0", GAS_LZ_FEE)
-
-#     print(f"\nFee to self: {fee_self}")
-#     print(f"Fee to deployer: {fee_deployer}")
-
-#     # Fees should be similar for different receivers
-#     assert abs(fee_self - fee_deployer) < fee_self * 0.1, "Fees should be similar"
 
 
 def test_quote_fee_revert_case(forked_env, lz_module_contract):
