@@ -11,7 +11,7 @@ functionality for lzSend messages and lzRead.
 2. Read request preparation - prepare_read_message for encoding read requests from calldata
 3. Unified sending - single _send_message function that works with both message types
 
-@license Copyright (c) Curve.Fi, 2020-2025 - all rights reserved
+@license Copyright (c) Curve.Fi, 2025 - all rights reserved
 
 @author curve.fi
 
@@ -45,9 +45,9 @@ LZ_MESSAGE_SIZE_CAP: public(constant(uint256)) = 512
 LZ_READ_CALLDATA_SIZE: public(constant(uint256)) = 256
 
 # LayerZero protocol constants
-TYPE_3: constant(bytes2) = 0x0003 #uint16
-WORKER_ID: constant(bytes1) = 0x01 #uint8
-OPTIONS_HEADER: constant(bytes3) = 0x000301 # concat(TYPE_3, WORKER_ID)
+TYPE_3: constant(bytes2) = 0x0003  # uint16
+WORKER_ID: constant(bytes1) = 0x01  # uint8
+OPTIONS_HEADER: constant(bytes3) = 0x000301  # concat(TYPE_3, WORKER_ID)
 
 OPTION_TYPE_LZRECEIVE: constant(bytes1) = 0x01
 OPTION_TYPE_NATIVE_DROP: constant(bytes1) = 0x02
@@ -195,6 +195,7 @@ def _set_receive_lib(_eid: uint32, _lib: address):
     extcall ILayerZeroEndpointV2(LZ_ENDPOINT).setReceiveLibrary(self, _eid, _lib, 0)
     # 0 is for grace period, not used in this contract
 
+
 @internal
 def _set_uln_config(
     _eid: uint32,
@@ -241,7 +242,7 @@ def _prepare_message_options(_gas: uint256, _value: uint256) -> Bytes[LZ_OPTION_
 
     return concat(
         OPTIONS_HEADER,
-        convert(convert(option_len+1, uint16), bytes2), # length (option + 1 [type])
+        convert(convert(option_len + 1, uint16), bytes2),  # length (option + 1 [type])
         OPTION_TYPE_LZRECEIVE,
         slice(option_data, 0, option_len),
     )
@@ -249,13 +250,16 @@ def _prepare_message_options(_gas: uint256, _value: uint256) -> Bytes[LZ_OPTION_
 
 @internal
 @pure
-def _prepare_read_options(_gas: uint256, _value: uint256, _data_size: uint32) -> Bytes[LZ_OPTION_SIZE]:
+def _prepare_read_options(
+    _gas: uint256, _value: uint256, _data_size: uint32
+) -> Bytes[LZ_OPTION_SIZE]:
     """
     @notice Build options for read request
     @param _gas Gas limit for execution
     @param _data_size Expected response data size
     @param _value Native value for execution
     """
+
     gas_data_option: Bytes[20] = concat(
         convert(convert(_gas, uint128), bytes16),  # gas
         convert(_data_size, bytes4),  # data size
@@ -273,23 +277,6 @@ def _prepare_read_options(_gas: uint256, _value: uint256, _data_size: uint32) ->
         OPTION_TYPE_LZREAD,
         slice(option_data, 0, option_len),
     )
-
-# @internal
-# def _append_native_drop_option(_options: Bytes[LZ_OPTION_SIZE], _amount: uint256, _receiver: address) -> Bytes[LZ_DOUBLE_OPTION_SIZE]:
-#     """
-#     @notice Append native token drop option to existing options
-#     @param _options Existing options
-#     @param _amount Amount to drop
-#     """
-#     drop_option: Bytes[48] = abi_encode(convert(_amount, uint128), convert(_receiver, bytes32))
-#     return concat(
-#         _options,
-#         TYPE_3,
-#         WORKER_ID,
-#         convert(48, bytes2), # length is uint128+bytes32=16+32=48
-#         OPTION_TYPE_NATIVE_DROP,
-#         drop_option,
-#     )
 
 
 @internal
@@ -551,6 +538,12 @@ def prepare_read_message_bytes(
     _blockNumOrTimestamp: uint64 = 0,  # Uses latest ts (or block!) if 0
     _confirmations: uint16 = 15,
 ) -> Bytes[LZ_MESSAGE_SIZE_CAP]:
+    """
+    @notice Prepare read request message from basic parameters
+    @dev Constructs EVMCallRequestV1, encodes it into message and returns Bytes
+    Uses current block timestamp and default confirmations.
+    """
+
     return self._prepare_read_message_bytes(
         _dst_eid, _target, _calldata, _isBlockNum, _blockNumOrTimestamp, _confirmations
     )
@@ -566,6 +559,8 @@ def quote_lz_fee(
     _value: uint256 = 0,
     _data_size: uint32 = 0,
 ) -> uint256:
+    """@notice Quote fee for sending message"""
+
     return self._quote_lz_fee(_dstEid, _receiver, _message, _gas_limit, _value, _data_size)
 
 
@@ -573,6 +568,7 @@ def quote_lz_fee(
 @external
 def nextNonce(_srcEid: uint32, _sender: bytes32) -> uint64:
     """@notice Protocol endpoint for nonce tracking"""
+
     return 0
 
 
@@ -580,4 +576,5 @@ def nextNonce(_srcEid: uint32, _sender: bytes32) -> uint64:
 @external
 def allowInitializePath(_origin: Origin) -> bool:
     """@notice Protocol endpoint for path initialization"""
+
     return True
