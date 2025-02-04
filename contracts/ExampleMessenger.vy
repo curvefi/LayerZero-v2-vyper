@@ -194,6 +194,17 @@ def set_lz_uln_config(
     )
 
 
+@external
+def withdraw_eth(_amount: uint256):
+    """
+    @notice Withdraw ETH from contract
+    @param _amount Amount to withdraw
+    """
+    ownable._check_owner()
+    assert self.balance >= _amount, "Insufficient balance"
+    send(msg.sender, _amount)
+
+
 ################################################################
 #                    MESSAGING FUNCTIONS                       #
 ################################################################
@@ -201,19 +212,19 @@ def set_lz_uln_config(
 @view
 @external
 def quote_message_fee(
-    _dst_eid: uint32, _receiver: address, _message: String[128], _gas_limit: uint256 = 0
+    _dst_eid: uint32, _receiver: address, _message: String[128], _gas_limit: uint256 = 0, _value: uint256 = 0
 ) -> uint256:
     """
     @notice Quote fee for sending message
     """
     encoded: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = convert(_message, Bytes[lz.LZ_MESSAGE_SIZE_CAP])
-    return lz._quote_lz_fee(_dst_eid, _receiver, encoded, _gas_limit)
+    return lz._quote_lz_fee(_dst_eid, _receiver, encoded, _gas_limit, _value)
 
 
 @payable
 @external
 def send_message(
-    _dst_eid: uint32, _receiver: address, _message: String[128], _gas_limit: uint256 = 0
+    _dst_eid: uint32, _receiver: address, _message: String[128], _gas_limit: uint256 = 0, _value: uint256 = 0, _check_fee: bool = False
 ):
     """
     @notice Send a string message to contract on another chain
@@ -221,9 +232,10 @@ def send_message(
     @param _receiver Target contract address
     @param _message String message to send
     @param _gas_limit Optional gas limit override
+    @param _value Optional value to send with message
     """
     encoded: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = convert(_message, Bytes[lz.LZ_MESSAGE_SIZE_CAP])
-    lz._send_message(_dst_eid, convert(_receiver, bytes32), encoded, _gas_limit)
+    lz._send_message(_dst_eid, convert(_receiver, bytes32), encoded, _gas_limit, _value, 0, _check_fee)
     log MessageSent(_dst_eid, _message, msg.value)
 
 
@@ -234,6 +246,7 @@ def quote_read_fee(
     _target: address,
     _calldata: Bytes[128],
     _gas_limit: uint256 = 0,
+    _value: uint256 = 0,
     _data_size: uint32 = 64,
 ) -> uint256:
     """
@@ -243,7 +256,7 @@ def quote_read_fee(
         _dst_eid, _target, _calldata
     )
 
-    return lz._quote_lz_fee(lz.LZ_READ_CHANNEL, empty(address), message, _gas_limit, _data_size)
+    return lz._quote_lz_fee(lz.LZ_READ_CHANNEL, empty(address), message, _gas_limit, _value, _data_size)
 
 
 @payable
@@ -253,7 +266,9 @@ def request_read(
     _target: address,
     _calldata: Bytes[128],
     _gas_limit: uint256 = 0,
+    _value: uint256 = 0,
     _data_size: uint32 = 64,
+    _check_fee: bool = False,
 ):
     """
     @notice Send read request to another chain
@@ -261,7 +276,9 @@ def request_read(
     @param _target Contract to read from
     @param _calldata Function call data
     @param _gas_limit Optional gas limit
+    @param _value Optional value to send with message
     @param _data_size Expected response size
+    @param _check_fee Validate sufficent fee before sending
     """
     # Prepare read message
     message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = lz._prepare_read_message_bytes(
@@ -274,7 +291,9 @@ def request_read(
         convert(self, bytes32),  # self receiver for reads
         message,
         _gas_limit,
+        _value,
         _data_size,
+        _check_fee
     )
 
     log ReadRequestSent(_dst_eid, _target, _calldata)
