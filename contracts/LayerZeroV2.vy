@@ -494,7 +494,18 @@ def _send_message(
     _refund_address: address = msg.sender,
     _perform_fee_check: bool = False,
 ):
-    """@notice Send message using prepared parameters"""
+    """@notice Send message using prepared parameters
+    @dev This function is used to send both regular messages and read requests
+    @param _dstEid Destination chain ID
+    @param _receiver Target address
+    @param _message Message payload or encoded read request
+    @param _gas_limit Gas limit for execution
+    @param _lz_receive_value Value to send in lzReceive
+    @param _data_size For read requests, expected response size
+    @param _request_msg_value Value to send in request message (msg.value or less)
+    @param _refund_address Address to refund any excess msg.value
+    @param _perform_fee_check Whether to perform fee check
+    """
 
     params: MessagingParams = self._prepare_messaging_params(
         _dstEid, _receiver, _message, _gas_limit, _lz_receive_value, _data_size
