@@ -1,112 +1,24 @@
 # LayerZero V2 Vyper Module
 
-A Vyper module for LayerZero V2 cross-chain messaging with example implementation.
+This module rewrites all the important LayerZero V2 endpoint interfaces in Vyper into a standalone package. It’s built for anyone looking to integrate cross-chain messaging into their projects with ease and security. Curve Blockahs Oracle is powered by this module (GitHub link coming soon).
 
 ## Overview
 
-This repository contains:
-- `LayerZeroV2.vy`: Base module for LayerZero V2 messaging
-- `ExampleMessenger.vy`: Example implementation for string messaging
-- Tests for module functionality
+The module simplifies:
+- Message encoding and fee estimation.
+- Secure transmission and receipt of cross-chain messages.
+- Easy integration into your Vyper contracts.
 
-## Contracts
+## Security
 
-### LayerZeroV2
-
-Base module that handles core LayerZero V2 functionality:
-- Message sending with fee management
-- Message receiving with security checks
-- Peer management
-- Gas limit configuration
-
-Key features:
-- Adjustable message size (LZ_MESSAGE_SIZE_CAP)
-- Security checks for trusted peers
-- Fee quoting and payment handling
-- Designed for module imports
-
-### Example Messenger
-
-Example implementation showing how to use the LZ module:
-- String message sending across chains
-- Message receiving and conversion
-- Ownable management for security
-- Gas limit configuration
-
-Features:
-- String messages up to 128 bytes
-- Owner-controlled peer management
-- Event emission for tracking
-- Example of proper module initialization
-
-## Testing
-
-Tests cover:
-1. Message Sending
-   - Fee quoting
-   - Peer management
-   - Event emission
-
-2. Message Receiving
-   - Security checks
-   - Message conversion
-   - Event verification
-
-3. Security
-   - Endpoint verification
-   - Peer validation
-   - Owner controls
-
-## Usage
-
-### Module Import
-
-```python
-import LayerZeroV2 as lz
-initializes: lz
-exports: (
-    lz.LZ_ENDPOINT,
-    lz.LZ_PEERS,
-    lz.LZ_MESSAGE_SIZE_CAP,
-    lz.default_gas_limit,
-    lz.quote_lz_fee,
-)
-```
-
-### Initialization
-
-```python
-@deploy
-def __init__(_endpoint: address, _gas_limit: uint256):
-    lz.__init__(_endpoint, _gas_limit)
-```
-
-### Sending Messages
-
-```python
-@payable
-@external
-def send_message(_dst_eid: uint32, _receiver: address, _message: String[128]):
-    encoded: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = convert(_message, Bytes[lz.LZ_MESSAGE_SIZE_CAP])
-    lz._send_message(_dst_eid, _receiver, encoded)
-```
-
-### Receiving Messages
-
-```python
-@payable
-@external
-def lzReceive(_origin: lz.Origin, _message: Bytes[lz.LZ_MESSAGE_SIZE_CAP], ...):
-    assert lz._lz_receive(...)
-    message: String[128] = convert(_message, String[128])
-```
+Always ensure proper peer setup and ownership management when deploying. Code has not been audited yet and probably contains bugs.
 
 ## Development
 
 Requirements:
 - Python 3.9+
 - Vyper ~=0.4
-- LayerZero V2 endpoint deployment
+- LayerZero V2 endpoint deployment on your chain of choice
 
 Testing:
 ```bash
@@ -119,6 +31,13 @@ source venv/bin/activate
 pytest tests/
 ```
 
-## Security
+## Testnet Example
 
-Always ensure proper peer setup and ownership management when deploying. Code has not been audited yet and probably contains bugs.
+The `lz_testnet.ipynb` notebook included in the repository shows how to deploy this module on a testnet, quote fees, and enable cross-chain message passing. It’s a simple way to see everything in action before integrating into your main project.
+
+Notably, handling incoming messages can follow a recursive pattern. For example, your `lzReceive` might decode a message and trigger another lzSend.
+
+Happy coding!
+
+## Example Use
+ExampleMessager.vy contract provides a simple example of how to use the module.
