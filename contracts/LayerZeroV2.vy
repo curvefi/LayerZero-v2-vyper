@@ -254,52 +254,36 @@ def _set_uln_config(
 
 @internal
 @pure
-def _prepare_message_options(_gas: uint256, _value: uint256) -> Bytes[LZ_OPTION_SIZE]:
+def _prepare_options(_gas: uint256, _value: uint256, _data_size: uint32) -> Bytes[LZ_OPTION_SIZE]:
     """
-    @notice Build options for regular message sending
+    @notice Build options for message sending
     @param _gas Gas limit for execution on destination
+    @param _value Optional native value
+    @param _data_size If nonzero, indicates a read request; otherwise regular message
     """
+    gas_bytes: Bytes[16] = concat(convert(convert(_gas, uint128), bytes16), b"")  # gas
+    value_bytes: Bytes[16] = concat(convert(convert(_value, uint128), bytes16), b"")  # value
+    data_size_bytes: Bytes[4] = concat(convert(_data_size, bytes4), b"")  # data size
 
-    gas_option: bytes16 = convert(convert(_gas, uint128), bytes16)  # gas
-    option_data: Bytes[32] = concat(gas_option, b"")  # explicitly create Bytes[32]
-
-    if _value > 0:
-        option_data = concat(gas_option, convert(convert(_value, uint128), bytes16))
+    full_option: Bytes[36] = empty(Bytes[36])
+    if _data_size > 0 and _value > 0:
+        # read request with value
+        full_option = concat(gas_bytes, data_size_bytes, value_bytes)
+    elif _data_size > 0:
+        # read request without value
+        full_option = concat(gas_bytes, data_size_bytes)
+    elif _value > 0:
+        # regular message with value
+        full_option = concat(gas_bytes, value_bytes)
+    else:
+        # regular message without value
+        full_option = gas_bytes
 
     return concat(
         OPTIONS_HEADER,
-        convert(convert(len(option_data) + 1, uint16), bytes2),  # length (option) + 1 [type]
-        OPTION_TYPE_LZRECEIVE,
-        option_data,
-    )
-
-
-@internal
-@pure
-def _prepare_read_options(
-    _gas: uint256, _value: uint256, _data_size: uint32
-) -> Bytes[LZ_OPTION_SIZE]:
-    """
-    @notice Build options for read request
-    @param _gas Gas limit for execution
-    @param _data_size Expected response data size
-    @param _value Native value for execution
-    """
-
-    gas_data_option: Bytes[20] = concat(
-        convert(convert(_gas, uint128), bytes16),  # gas
-        convert(_data_size, bytes4),  # data size
-    )
-    option_data: Bytes[36] = concat(gas_data_option, b"")  # explicitly create Bytes[36]
-
-    if _value > 0:
-        option_data = concat(gas_data_option, convert(convert(_value, uint128), bytes16))
-
-    return concat(
-        OPTIONS_HEADER,
-        convert(convert(len(option_data) + 1, uint16), bytes2),  # length (option) + 1 [type]
-        OPTION_TYPE_LZREAD,
-        option_data,
+        convert(convert(len(full_option) + 1, uint16), bytes2),  # length (option) + 1 [type]
+        OPTION_TYPE_LZREAD if _data_size > 0 else OPTION_TYPE_LZRECEIVE,
+        full_option,
     )
 
 
@@ -422,14 +406,7 @@ def _prepare_messaging_params(
     """
 
     gas: uint256 = _gas_limit if _gas_limit != 0 else self.default_gas_limit
-
-    # Choose appropriate options based on message type
-    options: Bytes[LZ_OPTION_SIZE] = (
-        self._prepare_read_options(gas, _value, _data_size)
-        if _data_size > 0
-        else self._prepare_message_options(gas, _value)
-    )
-
+    options: Bytes[LZ_OPTION_SIZE] = self._prepare_options(gas, _value, _data_size)
     return MessagingParams(
         dstEid=_dstEid, receiver=_receiver, message=_message, options=options, payInLzToken=False
     )

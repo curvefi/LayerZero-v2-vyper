@@ -168,7 +168,7 @@ def test_contract_options(lz_module_contract):
     # Test contract options
     options_python = build_default_options(60000)
     print(f"Python options: 0x{options_python.hex()}")
-    options_contract = lz_module_contract.eval(f"self._prepare_message_options({60000}, {0})")
+    options_contract = lz_module_contract.eval(f"self._prepare_options({60000}, {0}, {0})")
     print(f"Contract options: 0x{options_contract.hex()}")
     assert options_python == options_contract
 
@@ -186,7 +186,7 @@ def test_lz_read_options():
 def test_contract_read_options(lz_module_contract):
     options_python = ExecutorOptions.new_options()
     options_python = ExecutorOptions.add_lz_read_option(options_python, gas=100000, data_size=64)
-    options_contract = lz_module_contract.eval(f"self._prepare_read_options({100000}, {0}, {64})")
+    options_contract = lz_module_contract.eval(f"self._prepare_options({100000}, {0}, {64})")
     print(f"\nPython read options: 0x{options_python.hex()}")
     print(f"Contract read options: 0x{options_contract.hex()}")
     assert options_python == options_contract
@@ -246,7 +246,7 @@ def test_value_options(lz_module_contract):
     options_python = ExecutorOptions.new_options()
     options_python = ExecutorOptions.add_lz_receive_option(options_python, gas=60000, value=value)
 
-    options_contract = lz_module_contract.eval(f"self._prepare_message_options({60000}, {value})")
+    options_contract = lz_module_contract.eval(f"self._prepare_options({60000}, {value}, {0})")
 
     print(f"\nPython value options: 0x{options_python.hex()}")
     print(f"Contract value options: 0x{options_contract.hex()}")
@@ -259,7 +259,7 @@ def test_value_options(lz_module_contract):
     )
 
     read_options_contract = lz_module_contract.eval(
-        f"self._prepare_read_options({100000}, {value}, {64})"
+        f"self._prepare_options({100000}, {value}, {64})"
     )
 
     print(f"\nPython read value options: 0x{read_options_python.hex()}")
