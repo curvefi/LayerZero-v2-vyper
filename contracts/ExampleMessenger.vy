@@ -30,7 +30,6 @@ exports: (
     lz.LZ_READ_CALLDATA_SIZE,
     lz.LZ_READ_CHANNEL,
     lz.default_gas_limit,
-    lz.quote_lz_fee,
     lz.nextNonce,
     lz.allowInitializePath,
 )
@@ -86,7 +85,8 @@ def __init__(_endpoint: address, _gas_limit: uint256):
     @param _endpoint LayerZero endpoint address
     @param _gas_limit Default gas limit for cross-chain messages
     """
-    lz.__init__(_endpoint, _gas_limit, 4294967295)
+    lz.__init__()
+    lz._initialize(_endpoint, _gas_limit, 4294967295, [], [])
     lz._set_delegate(msg.sender)
     ownable.__init__()
     ownable_2step.__init__()
@@ -202,15 +202,13 @@ def set_lz_uln_config(
 
 
 @external
-def withdraw_eth(_amount: uint256 = 0):
+def withdraw_eth(_amount: uint256):
     """
     @notice Withdraw ETH from contract
     @param _amount Amount to withdraw
     """
 
     ownable._check_owner()
-    if _amount == 0:
-        _amount = self.balance
     assert self.balance >= _amount, "Insufficient balance"
     send(msg.sender, _amount)
 
@@ -256,9 +254,21 @@ def send_message(
     """
 
     encoded: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = convert(_message, Bytes[lz.LZ_MESSAGE_SIZE_CAP])
+    # lz._send_message(
+    #     _dst_eid, convert(_receiver, bytes32), encoded, _gas_limit, _value, 0, _check_fee
+    # )
     lz._send_message(
-        _dst_eid, convert(_receiver, bytes32), encoded, _gas_limit, _value, 0, _check_fee
+        _dst_eid,  # _dstEid
+        convert(_receiver, bytes32),  # _receiver
+        encoded,  # _message
+        _gas_limit,  # _gas_limit: Use default gas limit
+        _value,  # _lz_receive_value: No value to attach to receive call
+        0,  # _data_size: Zero data size (not a read)
+        msg.value,  # _request_msg_value
+        msg.sender,  # _refund_address
+        False,  # _perform_fee_check: No fee check
     )
+
     log MessageSent(_dst_eid, _message, msg.value)
 
 
@@ -313,14 +323,25 @@ def request_read(
     )
 
     # Send to read channel
+    # lz._send_message(
+    #     lz.LZ_READ_CHANNEL,  # Read channel
+    #     convert(self, bytes32),  # self receiver for reads
+    #     message,
+    #     _gas_limit,
+    #     _value,
+    #     _data_size,
+    #     _check_fee,
+    # )
     lz._send_message(
-        lz.LZ_READ_CHANNEL,  # Read channel
-        convert(self, bytes32),  # self receiver for reads
-        message,
-        _gas_limit,
-        _value,
-        _data_size,
-        _check_fee,
+        lz.LZ_READ_CHANNEL,  # _dstEid
+        convert(self, bytes32),  # _receiver
+        message,  # _message
+        _gas_limit,  # _gas_limit: Use default gas limit
+        _value,  # _lz_receive_value: Will be available in lzReceive (and pay for broadcasts)
+        _data_size,  # _data_size: Expected read size (uint256: block number, bytes32: block hash)
+        msg.value,  # _request_msg_value: Use cached fee as send message value
+        msg.sender,  # _refund_address: Refund unspent fees to read requestor
+        _check_fee,  # _perform_fee_check: No fee check
     )
 
     log ReadRequestSent(_dst_eid, _target, _calldata)

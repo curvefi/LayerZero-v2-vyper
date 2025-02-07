@@ -36,6 +36,8 @@ def test_send_message(forked_env, messenger_contract, dev_deployer):
         messenger_contract.address,
         TEST_MESSAGE,
         GAS_LZ_FEE,
+        0,
+        False,
         value=3 * required_fee,
         sender=dev_deployer,
     )

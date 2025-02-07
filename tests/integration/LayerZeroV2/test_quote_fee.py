@@ -8,12 +8,9 @@ TEST_CALLDATA = bytes.fromhex("aabbcc")
 
 def test_quote_regular_message(forked_env, lz_module_contract):
     """Test basic quote for regular message sending"""
-    # Get quote for basic message
-    fee = lz_module_contract.quote_lz_fee(
-        LZ_ENDPOINT_ID,
-        lz_module_contract.address,
-        b"0",  # simple message
-        GAS_LZ_FEE,
+    # Get quote for basic message using internal function
+    fee = lz_module_contract.eval(
+        f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {lz_module_contract.address}, b'0', {GAS_LZ_FEE})"
     )
     print(f"\nBasic message quote fee: {fee}")
 
@@ -24,23 +21,13 @@ def test_quote_regular_message(forked_env, lz_module_contract):
 def test_quote_read_message(forked_env, lz_module_contract):
     """Test quote for read message"""
     # Prepare read message bytes
-    message = lz_module_contract.prepare_read_message_bytes(
-        LZ_ENDPOINT_ID,
-        lz_module_contract.address,
-        TEST_CALLDATA,
-        False,  # use timestamp
-        0,  # use current
-        15,  # confirmations
+    message = lz_module_contract.eval(
+        f"self._prepare_read_message_bytes({LZ_ENDPOINT_ID}, {lz_module_contract.address}, {TEST_CALLDATA}, False, 0, 15)"
     )
 
     # Get quote using prepared message
-    fee = lz_module_contract.quote_lz_fee(
-        LZ_READ_CHANNEL,  # Read channel
-        lz_module_contract.address,  # receiver is self
-        message,
-        GAS_LZ_FEE,
-        0,
-        128,  # Expected response size
+    fee = lz_module_contract.eval(
+        f"self._quote_lz_fee({LZ_READ_CHANNEL}, {lz_module_contract.address}, {message}, {GAS_LZ_FEE}, 0, 128)"
     )
 
     print(f"\nRead message quote fee: {fee}")
@@ -51,19 +38,16 @@ def test_quote_fee_revert_case(forked_env, lz_module_contract):
     """Test cases where quote should revert"""
     # Invalid chain ID
     with boa.reverts():
-        lz_module_contract.quote_lz_fee(
-            0,  # Invalid EID
-            lz_module_contract.address,
-            b"0",
-            GAS_LZ_FEE,
+        lz_module_contract.eval(
+            f"self._quote_lz_fee(0, {lz_module_contract.address}, b'0', {GAS_LZ_FEE})"
         )
 
 
 def test_endpoint_interaction(forked_env, lz_module_contract, scan_url, scan_api):
     """Compare contract quote with direct endpoint call"""
-    # Get quote via contract
-    fee_contract = lz_module_contract.quote_lz_fee(
-        LZ_ENDPOINT_ID, lz_module_contract.address, b"0", GAS_LZ_FEE
+    # Get quote via internal function
+    fee_contract = lz_module_contract.eval(
+        f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {lz_module_contract.address}, b'0', {GAS_LZ_FEE})"
     )
 
     print(f"\nContract quote: {fee_contract}")
@@ -100,17 +84,13 @@ def test_read_message_preparation(forked_env, lz_module_contract):
     current_time = int(time.time())
 
     # Test with different parameters
-    message1 = lz_module_contract.prepare_read_message_bytes(
-        LZ_ENDPOINT_ID, lz_module_contract.address, TEST_CALLDATA
+    message1 = lz_module_contract.eval(
+        f"self._prepare_read_message_bytes({LZ_ENDPOINT_ID}, {lz_module_contract.address}, {TEST_CALLDATA})"
     )
 
-    message2 = lz_module_contract.prepare_read_message_bytes(
-        LZ_ENDPOINT_ID,
-        lz_module_contract.address,
-        TEST_CALLDATA,
-        True,  # use block number
-        current_time,
-        20,  # different confirmations
+    message2 = lz_module_contract.eval(
+        f"self._prepare_read_message_bytes({LZ_ENDPOINT_ID}, {lz_module_contract.address}, {TEST_CALLDATA}, "
+        f"True, {current_time}, 20)"
     )
 
     assert message1 != message2, "Messages should be different"
@@ -120,14 +100,13 @@ def test_read_message_preparation(forked_env, lz_module_contract):
 def test_gas_limit_handling(forked_env, lz_module_contract):
     """Test handling of gas limits"""
     # Test with default gas limit
-    fee1 = lz_module_contract.quote_lz_fee(LZ_ENDPOINT_ID, lz_module_contract.address, b"0")
+    fee1 = lz_module_contract.eval(
+        f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {lz_module_contract.address}, b'0')"
+    )
 
     # Test with custom gas limit
-    fee2 = lz_module_contract.quote_lz_fee(
-        LZ_ENDPOINT_ID,
-        lz_module_contract.address,
-        b"0",
-        GAS_LZ_FEE * 2,  # Double gas limit
+    fee2 = lz_module_contract.eval(
+        f"self._quote_lz_fee({LZ_ENDPOINT_ID}, {lz_module_contract.address}, b'0', {GAS_LZ_FEE * 2})"
     )
 
     assert fee2 > fee1, "Higher gas limit should result in higher fee"
