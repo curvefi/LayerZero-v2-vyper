@@ -56,3 +56,9 @@ venv.bak/
 tmp.json
 
 *lz_deployments.json
+
+# coverage
+.coveragerc
+.coverage
+coverage.xml
+htmlcov/

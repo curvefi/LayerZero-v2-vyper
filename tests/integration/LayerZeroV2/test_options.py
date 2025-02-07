@@ -43,13 +43,15 @@ class ExecutorOptions:
         return gas.to_bytes(16, "big") + value.to_bytes(16, "big")
 
     @staticmethod
-    def encode_lz_read(gas: int, data_size: int) -> bytes:
+    def encode_lz_read(gas: int, data_size: int, value: int = 0) -> bytes:
         """
         Encode LZ read option
         @param gas Gas limit for execution
         @param data_size Expected response data size
         """
-        return gas.to_bytes(16, "big") + data_size.to_bytes(4, "big")
+        if value == 0:
+            return gas.to_bytes(16, "big") + data_size.to_bytes(4, "big")
+        return gas.to_bytes(16, "big") + data_size.to_bytes(4, "big") + value.to_bytes(16, "big")
 
     @staticmethod
     def encode_native_drop(amount: int, receiver: bytes) -> bytes:
@@ -90,9 +92,9 @@ class ExecutorOptions:
         )
 
     @staticmethod
-    def add_lz_read_option(options: bytes, gas: int, data_size: int) -> bytes:
+    def add_lz_read_option(options: bytes, gas: int, data_size: int, value: int = 0) -> bytes:
         """Add LZ read option to existing options"""
-        option_data = ExecutorOptions.encode_lz_read(gas, data_size)
+        option_data = ExecutorOptions.encode_lz_read(gas, data_size, value)
         return ExecutorOptions.add_executor_option(
             options, ExecutorOptions.OPTION_TYPE_LZREAD, option_data
         )
@@ -235,3 +237,31 @@ def test_contract_request_encoding(lz_module_contract):
     print(f"\nPython encoded request: 0x{encoded_python.hex()}")
     print(f"Contract encoded request: 0x{encoded_contract.hex()}")
     assert encoded_python == encoded_contract
+
+
+def test_value_options(lz_module_contract):
+    """Test options with non-zero value"""
+    # Test regular message with value
+    value = 1000000  # 1M wei
+    options_python = ExecutorOptions.new_options()
+    options_python = ExecutorOptions.add_lz_receive_option(options_python, gas=60000, value=value)
+
+    options_contract = lz_module_contract.eval(f"self._prepare_message_options({60000}, {value})")
+
+    print(f"\nPython value options: 0x{options_python.hex()}")
+    print(f"Contract value options: 0x{options_contract.hex()}")
+    assert options_python == options_contract
+
+    # Test read message with value
+    read_options_python = ExecutorOptions.new_options()
+    read_options_python = ExecutorOptions.add_lz_read_option(
+        read_options_python, gas=100000, data_size=64, value=value
+    )
+
+    read_options_contract = lz_module_contract.eval(
+        f"self._prepare_read_options({100000}, {value}, {64})"
+    )
+
+    print(f"\nPython read value options: 0x{read_options_python.hex()}")
+    print(f"Contract read value options: 0x{read_options_contract.hex()}")
+    assert read_options_python == read_options_contract
