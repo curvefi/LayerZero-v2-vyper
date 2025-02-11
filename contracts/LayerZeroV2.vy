@@ -34,7 +34,7 @@ interface ILayerZeroEndpointV2:
         _oapp: address, _eid: uint32, _newLib: address, _gracePeriod: uint256
     ): nonpayable
     def setConfig(_oapp: address, _lib: address, _params: DynArray[SetConfigParam, 1]): nonpayable
-
+    def eid() -> uint32: view
 
 ################################################################
 #                           CONSTANTS                          #
@@ -64,17 +64,24 @@ LZ_OPTION_SIZE: constant(uint256) = 64
 
 #
 MAX_DVNS: constant(uint8) = 10
-MAX_INIT_PEERS: constant(uint256) = 32
+MAX_PEERS: constant(uint256) = 128
+
+
 ################################################################
 #                           STORAGE                            #
 ################################################################
 
-LZ_ENDPOINT: public(address)  # No longer immutable
+LZ_ENDPOINT: public(ILayerZeroEndpointV2)  # Not immutable for init fcn
+EID: public(uint32)
 LZ_PEERS: public(HashMap[uint32, address])
 LZ_READ_CHANNEL: public(uint32)
 LZ_DELEGATE: public(address)
 default_gas_limit: public(uint256)
 is_initialized: public(bool)
+
+# Track configured peer EIDs
+configured_eids: DynArray[uint32, MAX_PEERS]
+
 
 ################################################################
 #                           STRUCTS                            #
@@ -158,8 +165,8 @@ def _initialize(
     _endpoint: address,
     _default_gas_limit: uint256,
     _read_channel: uint32,
-    _peer_eids: DynArray[uint32, MAX_INIT_PEERS],
-    _peers: DynArray[address, MAX_INIT_PEERS],
+    _peer_eids: DynArray[uint32, MAX_PEERS],
+    _peers: DynArray[address, MAX_PEERS],
 ):
     """
     @notice Configure the contract with core settings
@@ -172,10 +179,11 @@ def _initialize(
     assert len(_peer_eids) == len(_peers), "Invalid peer arrays"
     assert not self.is_initialized, "Already initialized"
 
-    self.LZ_ENDPOINT = _endpoint
+    self.LZ_ENDPOINT = ILayerZeroEndpointV2(_endpoint)
+    self.EID = staticcall self.LZ_ENDPOINT.eid()
     self._set_default_gas_limit(_default_gas_limit)
     self._set_lz_read_channel(_read_channel)
-    for i: uint256 in range(0, len(_peer_eids), bound=MAX_INIT_PEERS):
+    for i: uint256 in range(0, len(_peer_eids), bound=MAX_PEERS):
         self._set_peer(_peer_eids[i], _peers[i])
     self.is_initialized = True
 
@@ -184,7 +192,20 @@ def _initialize(
 def _set_peer(_srcEid: uint32, _peer: address):
     """@notice Set trusted peer for chain ID"""
 
+    old_peer: address = self.LZ_PEERS[_srcEid]
     self.LZ_PEERS[_srcEid] = _peer
+
+    # Update configured_eids list
+    if old_peer == empty(address) and _peer != empty(address):
+        # New peer being added
+        self.configured_eids.append(_srcEid)
+    elif old_peer != empty(address) and _peer == empty(address):
+        # Peer being removed
+        updated_eids: DynArray[uint32, MAX_PEERS] = []
+        for eid: uint32 in self.configured_eids:
+            if eid != _srcEid:
+                updated_eids.append(eid)
+        self.configured_eids = updated_eids
 
 
 @internal
@@ -205,7 +226,7 @@ def _set_lz_read_channel(_read_channel: uint32):
 def _set_delegate(_delegate: address):
     """@notice Set delegate that can change any LZ setting"""
 
-    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).setDelegate(_delegate)
+    extcall self.LZ_ENDPOINT.setDelegate(_delegate)
     self.LZ_DELEGATE = _delegate
 
 
@@ -213,14 +234,14 @@ def _set_delegate(_delegate: address):
 def _set_send_lib(_eid: uint32, _lib: address):
     """@notice Set new send library for send requests"""
 
-    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).setSendLibrary(self, _eid, _lib)
+    extcall self.LZ_ENDPOINT.setSendLibrary(self, _eid, _lib)
 
 
 @internal
 def _set_receive_lib(_eid: uint32, _lib: address):
     """@notice Set new receive library for receive requests"""
 
-    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).setReceiveLibrary(self, _eid, _lib, 0)
+    extcall self.LZ_ENDPOINT.setReceiveLibrary(self, _eid, _lib, 0)
     # 0 is for grace period, not used in this contract
 
 
@@ -245,7 +266,7 @@ def _set_uln_config(
     )
 
     # Call endpoint to set config
-    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).setConfig(_oapp, _lib, [config_param])
+    extcall self.LZ_ENDPOINT.setConfig(_oapp, _lib, [config_param])
 
 
 ################################################################
@@ -477,7 +498,7 @@ def _quote_lz_fee(
     params: MessagingParams = self._prepare_messaging_params(
         _dstEid, convert(_receiver, bytes32), _message, _gas_limit, _value, _data_size
     )
-    fees: MessagingFee = staticcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).quote(params, self)
+    fees: MessagingFee = staticcall self.LZ_ENDPOINT.quote(params, self)
     return fees.nativeFee
 
 
@@ -519,10 +540,10 @@ def _send_message(
         message_value = _request_msg_value
 
     if _perform_fee_check:
-        fees: MessagingFee = staticcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).quote(params, self)
+        fees: MessagingFee = staticcall self.LZ_ENDPOINT.quote(params, self)
         assert message_value >= fees.nativeFee, "Not enough fees"
 
-    extcall ILayerZeroEndpointV2(self.LZ_ENDPOINT).send(
+    extcall self.LZ_ENDPOINT.send(
         params, _refund_address, value=message_value
     )
 
@@ -541,7 +562,7 @@ def _lz_receive(
     @dev Must be called by importing contract's lzReceive
     """
 
-    assert msg.sender == self.LZ_ENDPOINT, "Not LZ endpoint"
+    assert msg.sender == self.LZ_ENDPOINT.address, "Not LZ endpoint"
     assert self.LZ_PEERS[_origin.srcEid] != empty(address), "LZ Peer not set"
     assert (
         convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid]
@@ -552,6 +573,16 @@ def _lz_receive(
 ################################################################
 #                     EXTERNAL FUNCTIONS                       #
 ################################################################
+
+@view
+@external
+def get_configured_eids() -> DynArray[uint32, MAX_PEERS]:
+    """
+    @notice Get list of all configured peer EIDs
+    @return List of EIDs that have non-zero peer addresses
+    """
+    return self.configured_eids
+
 
 @view
 @external

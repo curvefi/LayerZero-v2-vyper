@@ -254,9 +254,6 @@ def send_message(
     """
 
     encoded: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = convert(_message, Bytes[lz.LZ_MESSAGE_SIZE_CAP])
-    # lz._send_message(
-    #     _dst_eid, convert(_receiver, bytes32), encoded, _gas_limit, _value, 0, _check_fee
-    # )
     lz._send_message(
         _dst_eid,  # _dstEid
         convert(_receiver, bytes32),  # _receiver
@@ -323,15 +320,6 @@ def request_read(
     )
 
     # Send to read channel
-    # lz._send_message(
-    #     lz.LZ_READ_CHANNEL,  # Read channel
-    #     convert(self, bytes32),  # self receiver for reads
-    #     message,
-    #     _gas_limit,
-    #     _value,
-    #     _data_size,
-    #     _check_fee,
-    # )
     lz._send_message(
         lz.LZ_READ_CHANNEL,  # _dstEid
         convert(self, bytes32),  # _receiver
@@ -379,3 +367,13 @@ def lzReceive(
 @external
 def dummy_endpoint(_input: uint256) -> uint256:
     return 2 * _input
+
+
+@external
+@payable
+def __default__():
+    """
+    @notice Default function to receive ETH
+    @dev This is needed to receive refunds from LayerZero
+    """
+    pass
