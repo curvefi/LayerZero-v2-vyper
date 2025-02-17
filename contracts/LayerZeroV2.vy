@@ -36,6 +36,7 @@ interface ILayerZeroEndpointV2:
     def setConfig(_oapp: address, _lib: address, _params: DynArray[SetConfigParam, 1]): nonpayable
     def eid() -> uint32: view
 
+
 ################################################################
 #                           CONSTANTS                          #
 ################################################################
@@ -138,6 +139,11 @@ struct ULNReadConfig:
     optional_dvn_threshold: uint8
     required_dvns: DynArray[address, MAX_DVNS]  # Max 10 DVNs
     optional_dvns: DynArray[address, MAX_DVNS]  # Max 10 DVNs
+
+
+struct ULNExecutorConfig:
+    max_message_size: uint32
+    executor: address
 
 
 ################################################################
@@ -255,6 +261,7 @@ def _set_uln_config(
     _required_dvns: DynArray[address, MAX_DVNS],
     _optional_dvns: DynArray[address, MAX_DVNS],
     _optional_dvn_threshold: uint8,
+    _executor: address = empty(address),
 ):
     """
     @notice Set ULN config for remote endpoint
@@ -262,11 +269,30 @@ def _set_uln_config(
     """
 
     config_param: SetConfigParam = self._prepare_uln_config(
-        _eid, _config_type, _confirmations, _required_dvns, _optional_dvns, _optional_dvn_threshold
+        _eid,
+        _config_type,
+        _confirmations,
+        _required_dvns,
+        _optional_dvns,
+        _optional_dvn_threshold,
+        _executor,
     )
 
     # Call endpoint to set config
     extcall self.LZ_ENDPOINT.setConfig(_oapp, _lib, [config_param])
+
+    if _executor != empty(address) and _eid < READ_CHANNEL_THRESHOLD:
+        # Set executor for ULN config
+        executor_config: ULNExecutorConfig = ULNExecutorConfig(
+            max_message_size=1024,
+            executor=_executor,
+        )
+        config_param_executor: SetConfigParam = SetConfigParam(
+            eid=_eid,
+            configType=1,  # 1 = ULN executor config
+            config=abi_encode(executor_config),
+        )
+        extcall self.LZ_ENDPOINT.setConfig(_oapp, _lib, [config_param_executor])
 
 
 ################################################################
@@ -317,6 +343,7 @@ def _prepare_uln_config(
     _required_dvns: DynArray[address, 10],
     _optional_dvns: DynArray[address, 10],
     _optional_dvn_threshold: uint8,
+    _executor: address = empty(address),
 ) -> SetConfigParam:
     """
     @notice Prepare ULN config from arrays, automatically calculating counts
@@ -329,7 +356,7 @@ def _prepare_uln_config(
 
     if _eid > READ_CHANNEL_THRESHOLD:  # read config
         uln_config: ULNReadConfig = ULNReadConfig(
-            executor=empty(address),  # default executor
+            executor=_executor,
             required_dvn_count=required_count,
             optional_dvn_count=optional_count,
             optional_dvn_threshold=_optional_dvn_threshold,
@@ -543,9 +570,7 @@ def _send_message(
         fees: MessagingFee = staticcall self.LZ_ENDPOINT.quote(params, self)
         assert message_value >= fees.nativeFee, "Not enough fees"
 
-    extcall self.LZ_ENDPOINT.send(
-        params, _refund_address, value=message_value
-    )
+    extcall self.LZ_ENDPOINT.send(params, _refund_address, value=message_value)
 
 
 @payable
