@@ -25,9 +25,7 @@ functionality for lzSend messages and lzRead.
 
 interface ILayerZeroEndpointV2:
     def quote(_params: MessagingParams, _sender: address) -> MessagingFee: view
-    def send(_params: MessagingParams, _refundAddress: address) -> (
-        bytes32, uint64, uint256, uint256
-    ): payable
+    def send(_params: MessagingParams, _refundAddress: address) -> MessagingReceipt: payable
     def setDelegate(_delegate: address): nonpayable
     def setSendLibrary(_oapp: address, _eid: uint32, _newLib: address): nonpayable
     def setReceiveLibrary(
@@ -53,7 +51,7 @@ OPTIONS_HEADER: constant(bytes3) = 0x000301  # concat(TYPE_3, WORKER_ID)
 OPTION_TYPE_LZRECEIVE: constant(bytes1) = 0x01
 OPTION_TYPE_NATIVE_DROP: constant(bytes1) = 0x02
 OPTION_TYPE_LZREAD: constant(bytes1) = 0x05
-READ_CHANNEL_THRESHOLD: constant(uint32) = 4294965694  # max(uint32)-1600
+READ_CHANNEL_THRESHOLD: constant(uint32) = 4294965694  # max(uint32)-1601, 1600 channels reserved for read
 
 # Read codec constants
 CMD_VERSION: constant(uint16) = 1
@@ -94,6 +92,12 @@ struct MessagingParams:
     message: Bytes[LZ_MESSAGE_SIZE_CAP]
     options: Bytes[LZ_OPTION_SIZE]
     payInLzToken: bool
+
+
+struct MessagingReceipt:
+    guid: bytes32
+    nonce: uint64
+    fee: MessagingFee
 
 
 struct MessagingFee:
@@ -237,24 +241,22 @@ def _set_delegate(_delegate: address):
 
 
 @internal
-def _set_send_lib(_oapp: address, _eid: uint32, _lib: address):
+def _set_send_lib(_eid: uint32, _lib: address):
     """@notice Set new send library for send requests"""
 
-    extcall self.LZ_ENDPOINT.setSendLibrary(_oapp, _eid, _lib)
+    extcall self.LZ_ENDPOINT.setSendLibrary(self, _eid, _lib)
 
 
 @internal
-def _set_receive_lib(_oapp: address, _eid: uint32, _lib: address):
+def _set_receive_lib(_eid: uint32, _lib: address, _grace_period: uint256 = 0):
     """@notice Set new receive library for receive requests"""
 
-    extcall self.LZ_ENDPOINT.setReceiveLibrary(_oapp, _eid, _lib, 0)
-    # 0 is for grace period, not used in this contract
+    extcall self.LZ_ENDPOINT.setReceiveLibrary(self, _eid, _lib, _grace_period)
 
 
 @internal
 def _set_uln_config(
     _eid: uint32,
-    _oapp: address,
     _lib: address,
     _config_type: uint32,
     _confirmations: uint64,
@@ -279,9 +281,9 @@ def _set_uln_config(
     )
 
     # Call endpoint to set config
-    extcall self.LZ_ENDPOINT.setConfig(_oapp, _lib, [config_param])
+    extcall self.LZ_ENDPOINT.setConfig(self, _lib, [config_param])
 
-    if _executor != empty(address) and _eid < READ_CHANNEL_THRESHOLD:
+    if _executor != empty(address) and _eid <= READ_CHANNEL_THRESHOLD:
         # Set executor for ULN config
         executor_config: ULNExecutorConfig = ULNExecutorConfig(
             max_message_size=1024,
@@ -292,7 +294,7 @@ def _set_uln_config(
             configType=1,  # 1 = ULN executor config
             config=abi_encode(executor_config),
         )
-        extcall self.LZ_ENDPOINT.setConfig(_oapp, _lib, [config_param_executor])
+        extcall self.LZ_ENDPOINT.setConfig(self, _lib, [config_param_executor])
 
 
 ################################################################
@@ -308,9 +310,9 @@ def _prepare_options(_gas: uint256, _value: uint256, _data_size: uint32) -> Byte
     @param _value Optional native value
     @param _data_size If nonzero, indicates a read request; otherwise regular message
     """
-    gas_bytes: Bytes[16] = concat(convert(convert(_gas, uint128), bytes16), b"")  # gas
-    value_bytes: Bytes[16] = concat(convert(convert(_value, uint128), bytes16), b"")  # value
-    data_size_bytes: Bytes[4] = concat(convert(_data_size, bytes4), b"")  # data size
+    gas_bytes: bytes16 = convert(convert(_gas, uint128), bytes16)  # gas
+    value_bytes: bytes16 = convert(convert(_value, uint128), bytes16)  # value
+    data_size_bytes: bytes4 = convert(_data_size, bytes4)  # data size
 
     full_option: Bytes[36] = empty(Bytes[36])
     if _data_size > 0 and _value > 0:
@@ -324,7 +326,7 @@ def _prepare_options(_gas: uint256, _value: uint256, _data_size: uint32) -> Byte
         full_option = concat(gas_bytes, value_bytes)
     else:
         # regular message without value
-        full_option = gas_bytes
+        full_option = concat(gas_bytes, b"") # bytes -> Bytes
 
     return concat(
         OPTIONS_HEADER,
@@ -340,8 +342,8 @@ def _prepare_uln_config(
     _eid: uint32,
     _config_type: uint32,
     _confirmations: uint64,
-    _required_dvns: DynArray[address, 10],
-    _optional_dvns: DynArray[address, 10],
+    _required_dvns: DynArray[address, MAX_DVNS],
+    _optional_dvns: DynArray[address, MAX_DVNS],
     _optional_dvn_threshold: uint8,
     _executor: address = empty(address),
 ) -> SetConfigParam:
@@ -541,7 +543,7 @@ def _send_message(
     _request_msg_value: uint256 = 0,
     _refund_address: address = msg.sender,
     _perform_fee_check: bool = False,
-):
+) -> MessagingReceipt:
     """@notice Send message using prepared parameters
     @dev This function is used to send both regular messages and read requests
     @param _dstEid Destination chain ID
@@ -570,7 +572,7 @@ def _send_message(
         fees: MessagingFee = staticcall self.LZ_ENDPOINT.quote(params, self)
         assert message_value >= fees.nativeFee, "Not enough fees"
 
-    extcall self.LZ_ENDPOINT.send(params, _refund_address, value=message_value)
+    return extcall self.LZ_ENDPOINT.send(params, _refund_address, value=message_value)
 
 
 @payable
@@ -586,12 +588,10 @@ def _lz_receive(
     @notice Base security checks for received messages
     @dev Must be called by importing contract's lzReceive
     """
-
+    peer: address = self.LZ_PEERS[_origin.srcEid]
     assert msg.sender == self.LZ_ENDPOINT.address, "Not LZ endpoint"
-    assert self.LZ_PEERS[_origin.srcEid] != empty(address), "LZ Peer not set"
-    assert (
-        convert(_origin.sender, address) == self.LZ_PEERS[_origin.srcEid]
-    ), "Invalid LZ message source!"
+    assert peer != empty(address), "LZ Peer not set"
+    assert convert(_origin.sender, address) == peer, "Invalid LZ message source!"
     return True
 
 

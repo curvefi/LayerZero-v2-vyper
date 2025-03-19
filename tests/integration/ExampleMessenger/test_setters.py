@@ -30,13 +30,11 @@ def test_set_libs(forked_env, messenger_contract, dev_deployer):
 
     with boa.env.prank(dev_deployer):
         # Test setting libraries
-        messenger_contract.set_lz_send_lib(messenger_contract.address, LZ_ENDPOINT_ID, SEND_LIB)
-        messenger_contract.set_lz_receive_lib(
-            messenger_contract.address, LZ_ENDPOINT_ID, RECEIVE_LIB
-        )
+        messenger_contract.set_lz_send_lib(LZ_ENDPOINT_ID, SEND_LIB)
+        messenger_contract.set_lz_receive_lib(LZ_ENDPOINT_ID, RECEIVE_LIB)
         read_channel = messenger_contract.LZ_READ_CHANNEL()
         print(f"\nRead channel: {read_channel}")
-        messenger_contract.set_lz_send_lib(messenger_contract.address, read_channel, READ_LIB)
+        messenger_contract.set_lz_send_lib(read_channel, READ_LIB)
 
 
 def test_set_uln(forked_env, messenger_contract, dev_deployer):
@@ -54,7 +52,6 @@ def test_set_uln(forked_env, messenger_contract, dev_deployer):
     with boa.env.prank(dev_deployer):
         messenger_contract.set_lz_uln_config(
             LZ_ENDPOINT_ID,
-            messenger_contract.address,
             SEND_LIB,
             CONFIG_TYPE_ULN,
             1,  # confirmations

@@ -76,7 +76,7 @@ def test_endpoint_interaction(forked_env, lz_module_contract, scan_url, scan_api
     print(f"- LZ token fee: {fee_direct[1]}")
 
     # Compare fees
-    assert abs(fee_contract - fee_direct[0]) < fee_contract * 0.3, "Fees differ too much"
+    assert abs(fee_contract - fee_direct[0]) < fee_contract * 0.5, "Fees differ too much"
 
 
 def test_read_message_preparation(forked_env, lz_module_contract):

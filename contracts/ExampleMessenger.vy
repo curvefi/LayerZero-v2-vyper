@@ -131,29 +131,27 @@ def set_lz_read_channel(_new_channel: uint32):
 
 
 @external
-def set_lz_send_lib(_oapp: address, _channel: uint32, _lib: address):
+def set_lz_send_lib(_channel: uint32, _lib: address):
     """
     @notice Set new send library for send requests
-    @param _oapp Originating application address
     @param _channel Send channel ID
     @param _lib New send library address
     """
 
     ownable._check_owner()
-    lz._set_send_lib(_oapp, _channel, _lib)
+    lz._set_send_lib(_channel, _lib)
 
 
 @external
-def set_lz_receive_lib(_oapp: address, _channel: uint32, _lib: address):
+def set_lz_receive_lib(_channel: uint32, _lib: address):
     """
     @notice Set new receive library for receive requests
-    @param _oapp Originating application address
     @param _channel Receive channel ID
     @param _lib New receive library address
     """
 
     ownable._check_owner()
-    lz._set_receive_lib(_oapp, _channel, _lib)
+    lz._set_receive_lib(_channel, _lib)
 
 
 @external
@@ -170,7 +168,6 @@ def set_lz_delegate(_delegate: address):
 @external
 def set_lz_uln_config(
     _eid: uint32,
-    _oapp: address,
     _lib: address,
     _config_type: uint32,
     _confirmations: uint64,
@@ -181,7 +178,6 @@ def set_lz_uln_config(
     """
     @notice Set new ULN configuration for cross-chain messages
     @param _eid Endpoint ID
-    @param _oapp Originating application address
     @param _lib Library address
     @param _config_type Configuration type
     @param _confirmations Number of confirmations required
@@ -193,7 +189,6 @@ def set_lz_uln_config(
     ownable._check_owner()
     lz._set_uln_config(
         _eid,
-        _oapp,
         _lib,
         _config_type,
         _confirmations,
