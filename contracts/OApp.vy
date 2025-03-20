@@ -39,6 +39,9 @@ exports: (
 # OptionsBuilder module
 import OptionsBuilder
 
+# ReadCMDCodecV1 module
+import ReadCMDCodecV1
+
 ################################################################
 #                         INTERFACES                           #
 ################################################################
@@ -103,44 +106,10 @@ event PeerSet:
 MAX_MESSAGE_SIZE: public(constant(uint256)) = 512
 MAX_EXTRA_DATA_SIZE: public(constant(uint256)) = 64
 
-# # Options size limits
-# MAX_OPTIONS_TOTAL_SIZE: public(constant(uint256)) = 256
-# MAX_OPTION_SINGLE_SIZE: public(constant(uint256)) = 64
-
-# # LayerZero protocol constants
-# TYPE_1: constant(uint16) = 1
-# TYPE_2: constant(uint16) = 2
-# TYPE_3: constant(uint16) = 3
-
-# EXECUTOR_WORKER_ID: constant(uint8) = 1
-# DVN_WORKER_ID: constant(uint8) = 2
-
-# # Option types
-# OPTION_TYPE_LZRECEIVE: constant(uint8) = 1
-# OPTION_TYPE_NATIVE_DROP: constant(uint8) = 2
-# OPTION_TYPE_LZCOMPOSE: constant(uint8) = 3
-# OPTION_TYPE_ORDERED_EXECUTION: constant(uint8) = 4
-# OPTION_TYPE_LZREAD: constant(uint8) = 5
-
-# # DVN option types
-# OPTION_TYPE_DVN: constant(uint8) = 10
-# OPTION_TYPE_DVN_PRECRIME: constant(uint8) = 1
-
 # # Read codec constants
 # CMD_VERSION: constant(uint16) = 1
 # REQUEST_VERSION: constant(uint8) = 1
 # RESOLVER_TYPE_SINGLE_VIEW_EVM_CALL: constant(uint16) = 1
-
-# # Compute settings
-# COMPUTE_SETTING_MAP_ONLY: constant(uint8) = 0
-# COMPUTE_SETTING_REDUCE_ONLY: constant(uint8) = 1
-# COMPUTE_SETTING_MAP_REDUCE: constant(uint8) = 2
-# COMPUTE_SETTING_NONE: constant(uint8) = 3
-
-# # Read channel threshold
-# READ_CHANNEL_THRESHOLD: constant(
-#     uint32
-# ) = 4294965694  # max(uint32)-1601, 1600 channels reserved for read
 
 # # Misc constants
 # MAX_DVNS: constant(uint8) = 10
@@ -493,99 +462,6 @@ def _lzSend(
         _refundAddress,
         value=native_fee,
     )
-
-
-# ################################################################
-# #                     ReadCmdCodecV1 LIBRARY                   #
-# ################################################################
-
-# @internal
-# @pure
-# def _encodeEVMCallRequestV1(_request: EVMCallRequestV1) -> Bytes[MAX_MESSAGE_SIZE]:
-#     """
-#     @notice Encodes a single EVM call request
-#     @param _request The EVM call request to encode
-#     @return Encoded request
-#     """
-#     # Calculate request size (35 bytes fixed + variable calldata)
-#     request_size: uint16 = convert(len(_request.callData) + 35, uint16)
-
-#     # Build header in smaller chunks to control byte sizes
-#     header_part1: Bytes[5] = concat(
-#         convert(REQUEST_VERSION, bytes1),  # request version
-#         convert(_request.appRequestLabel, bytes2),  # app request label
-#         convert(RESOLVER_TYPE_SINGLE_VIEW_EVM_CALL, bytes2),  # resolver type
-#     )
-#     header_part2: Bytes[7] = concat(
-#         convert(request_size, bytes2),  # payload size
-#         convert(_request.targetEid, bytes4),  # target EID
-#         convert(_request.isBlockNum, bytes1),  # isBlockNum flag
-#     )
-
-#     # Combine all parts
-#     header: Bytes[20] = concat(
-#         header_part1,
-#         header_part2,
-#         convert(_request.blockNumOrTimestamp, bytes8),  # block number or timestamp
-#     )
-
-#     # Encode the rest of the request
-#     request: Bytes[MAX_MESSAGE_SIZE] = concat(
-#         header,
-#         convert(_request.confirmations, bytes2),  # confirmations
-#         convert(_request.to, bytes20),  # target address
-#         _request.callData,  # call data
-#     )
-#     return request
-
-
-# @internal
-# @pure
-# def _encodeReadCmd(
-#     _request: EVMCallRequestV1,
-#     _appCmdLabel: uint16 = 0,
-# ) -> Bytes[MAX_MESSAGE_SIZE]:
-#     """
-#     @notice Creates a simplified read command (single request only)
-#     @param _appCmdLabel Application command label
-#     @param _request EVM call request
-#     @return Encoded read command
-#     """
-
-#     # Calculate request size (35 bytes of fixed fields + calldata)
-#     request_size: uint16 = convert(len(_request.callData) + 35, uint16)
-
-#     # Build parts of the header
-#     # First 6 bytes: command version, app cmd label, request count
-#     cmd_header: Bytes[6] = concat(
-#         convert(CMD_VERSION, bytes2),  # version = 1
-#         convert(_appCmdLabel, bytes2),  # app command label
-#         convert(1, bytes2),  # requests length = 1
-#     )
-
-#     # The request header (13 bytes)
-#     request_header: Bytes[13] = concat(
-#         convert(REQUEST_VERSION, bytes1),  # version = 1
-#         convert(_request.appRequestLabel, bytes2),  # request label
-#         convert(RESOLVER_TYPE_SINGLE_VIEW_EVM_CALL, bytes2),  # resolver type
-#         convert(request_size, bytes2),  # payload size
-#         convert(_request.targetEid, bytes4),  # target EID
-#         convert(request.isBlockNum, bytes1),  # isBlockNum flag
-#     )
-
-#     # Build the request body
-#     request_body: Bytes[MAX_MESSAGE_SIZE - 19] = concat(
-#         convert(request.blockNumOrTimestamp, bytes8),  # block number or timestamp
-#         convert(request.confirmations, bytes2),  # confirmations
-#         convert(request.to, bytes20),  # target address
-#         request.callData,  # call data
-#     )
-
-#     # Combine all parts - but we build it in steps to manage size
-#     part1: Bytes[19] = concat(cmd_header, request_header)
-
-#     # Return the complete message
-#     return concat(part1, request_body)
 
 
 # ################################################################

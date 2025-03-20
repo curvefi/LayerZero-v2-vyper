@@ -52,6 +52,7 @@ def newOptions() -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
 
     return options
 
+
 @internal
 def addExecutorOption(
     _options: Bytes[MAX_OPTIONS_TOTAL_SIZE],
@@ -190,7 +191,6 @@ def addExecutorLzReadOption(
         option = concat(convert(_gas, bytes16), convert(_size, bytes4))
 
     return self.addExecutorOption(_options, OPTION_TYPE_LZREAD, option)
-
 
 
 @internal
