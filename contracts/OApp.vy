@@ -36,6 +36,9 @@ exports: (
     ownable.renounce_ownership,
 )
 
+# OptionsBuilder module
+import OptionsBuilder
+
 ################################################################
 #                         INTERFACES                           #
 ################################################################
@@ -99,30 +102,29 @@ event PeerSet:
 # Message size limits
 MAX_MESSAGE_SIZE: public(constant(uint256)) = 512
 MAX_EXTRA_DATA_SIZE: public(constant(uint256)) = 64
-MAX_READ_CALLDATA_SIZE: public(constant(uint256)) = 256
 
-# Options size limits
-MAX_OPTIONS_TOTAL_SIZE: public(constant(uint256)) = 256
-MAX_OPTION_SINGLE_SIZE: public(constant(uint256)) = 64
+# # Options size limits
+# MAX_OPTIONS_TOTAL_SIZE: public(constant(uint256)) = 256
+# MAX_OPTION_SINGLE_SIZE: public(constant(uint256)) = 64
 
-# LayerZero protocol constants
-TYPE_1: constant(uint16) = 1
-TYPE_2: constant(uint16) = 2
-TYPE_3: constant(uint16) = 3
+# # LayerZero protocol constants
+# TYPE_1: constant(uint16) = 1
+# TYPE_2: constant(uint16) = 2
+# TYPE_3: constant(uint16) = 3
 
-EXECUTOR_WORKER_ID: constant(uint8) = 1
-DVN_WORKER_ID: constant(uint8) = 2
+# EXECUTOR_WORKER_ID: constant(uint8) = 1
+# DVN_WORKER_ID: constant(uint8) = 2
 
-# Option types
-OPTION_TYPE_LZRECEIVE: constant(uint8) = 1
-OPTION_TYPE_NATIVE_DROP: constant(uint8) = 2
-OPTION_TYPE_LZCOMPOSE: constant(uint8) = 3
-OPTION_TYPE_ORDERED_EXECUTION: constant(uint8) = 4
-OPTION_TYPE_LZREAD: constant(uint8) = 5
+# # Option types
+# OPTION_TYPE_LZRECEIVE: constant(uint8) = 1
+# OPTION_TYPE_NATIVE_DROP: constant(uint8) = 2
+# OPTION_TYPE_LZCOMPOSE: constant(uint8) = 3
+# OPTION_TYPE_ORDERED_EXECUTION: constant(uint8) = 4
+# OPTION_TYPE_LZREAD: constant(uint8) = 5
 
-# DVN option types
-OPTION_TYPE_DVN: constant(uint8) = 10
-OPTION_TYPE_DVN_PRECRIME: constant(uint8) = 1
+# # DVN option types
+# OPTION_TYPE_DVN: constant(uint8) = 10
+# OPTION_TYPE_DVN_PRECRIME: constant(uint8) = 1
 
 # # Read codec constants
 # CMD_VERSION: constant(uint16) = 1
@@ -167,7 +169,7 @@ struct MessagingParams:
     dstEid: uint32
     receiver: bytes32
     message: Bytes[MAX_MESSAGE_SIZE]
-    options: Bytes[MAX_OPTIONS_TOTAL_SIZE]
+    options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE]
     payInLzToken: bool
 
 
@@ -413,7 +415,7 @@ def lzReceive(
 def _quote(
     _dstEid: uint32,
     _message: Bytes[MAX_MESSAGE_SIZE],
-    _options: Bytes[MAX_OPTIONS_TOTAL_SIZE],
+    _options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE],
     _payInLzToken: bool,
 ) -> MessagingFee:
     """
@@ -444,7 +446,7 @@ def _quote(
 def _lzSend(
     _dstEid: uint32,
     _message: Bytes[MAX_MESSAGE_SIZE],
-    _options: Bytes[MAX_OPTIONS_TOTAL_SIZE],
+    _options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE],
     _fee: MessagingFee,
     _refundAddress: address,
 ) -> MessagingReceipt:

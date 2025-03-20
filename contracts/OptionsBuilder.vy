@@ -1,12 +1,6 @@
 # pragma version 0.4.1
 
 """
-@title OApp (LayerZero V2 OApp Standard)
-
-@notice Vyper implementation of LayerZero OApp standard.
-This contract implements the OApp interface for cross-chain messaging via LayerZero.
-It combines the functionality of OAppCore, OAppSender, OAppReceiver, and OAppRead
-into a single contract.
 
 @license Copyright (c) Curve.Fi, 2025 - all rights reserved
 
@@ -20,8 +14,8 @@ into a single contract.
 ################################################################
 
 # Options size limits
-MAX_OPTIONS_TOTAL_SIZE: public(constant(uint256)) = 256
-MAX_OPTION_SINGLE_SIZE: public(constant(uint256)) = 64
+MAX_OPTIONS_TOTAL_SIZE: constant(uint256) = 256
+MAX_OPTION_SINGLE_SIZE: constant(uint256) = 64
 
 # LayerZero protocol constants
 TYPE_1: constant(uint16) = 1
@@ -42,14 +36,6 @@ OPTION_TYPE_LZREAD: constant(uint8) = 5
 OPTION_TYPE_DVN: constant(uint8) = 10
 OPTION_TYPE_DVN_PRECRIME: constant(uint8) = 1
 
-
-################################################################
-#                         CONSTRUCTOR                          #
-################################################################
-
-@deploy
-def __init__():
-    pass
 
 ################################################################
 #                        OptionsBuilder                        #
