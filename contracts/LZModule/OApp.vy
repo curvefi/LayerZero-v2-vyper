@@ -8,12 +8,15 @@ This contract implements the OApp interface for cross-chain messaging via LayerZ
 It combines the functionality of OAppCore, OAppSender, OAppReceiver, and OAppRead
 into a single contract.
 
-@dev Core functionality includes:
-1. Peer management - setting and verifying trusted remote endpoints
-2. Message sending - quoting fees and sending messages across chains
-3. Message receiving - verifying and processing inbound messages
-4. Read requests - cross-chain view calls
-5. Configuration - setting up endpoint libraries and DVN configurations
+To use _quote/_lzSend, you must provide _options.
+To build options, OptionsBuilder.vy should be used in your app.
+
+To use lzRead functionality, you must use ReadCmdCodecV1.vy to encode read requests.
+
+@dev Vyper implementation differs from Solidity OApp in:
+- message size limits are handled differently (Vyper does not allow infinite bytes arrays, must be capped)
+- fees are handled differently (payNative, payLzToken are inlined and allow many sends in single tx)
+
 
 @license Copyright (c) Curve.Fi, 2025 - all rights reserved
 
@@ -26,21 +29,12 @@ into a single contract.
 #                            MODULES                           #
 ################################################################
 
-# Import ownership management
+# Import ownership management. Defer initialization to main contract.
 from snekmate.auth import ownable
+uses: ownable
 
-initializes: ownable
-exports: (
-    ownable.owner,
-    ownable.transfer_ownership,
-    ownable.renounce_ownership,
-)
-
-# OptionsBuilder module
-import OptionsBuilder
-
-# ReadCMDCodecV1 module
-import ReadCMDCodecV1
+# Vyper-specific constants
+from . import VyperConstants as constants
 
 ################################################################
 #                         INTERFACES                           #
@@ -54,11 +48,6 @@ interface ILayerZeroEndpointV2:
     def quote(_params: MessagingParams, _sender: address) -> MessagingFee: view
     def send(_params: MessagingParams, _refundAddress: address) -> MessagingReceipt: payable
     def setDelegate(_delegate: address): nonpayable
-    def setSendLibrary(_oapp: address, _eid: uint32, _newLib: address): nonpayable
-    def setReceiveLibrary(
-        _oapp: address, _eid: uint32, _newLib: address, _gracePeriod: uint256
-    ): nonpayable
-    def setConfig(_oapp: address, _lib: address, _params: DynArray[SetConfigParam, 1]): nonpayable
     def eid() -> uint32: view
     def lzToken() -> address: view
     def skip(_oapp: address, _srcEid: uint32, _sender: bytes32, _nonce: uint64): nonpayable
@@ -73,43 +62,14 @@ event PeerSet:
     peer: bytes32
 
 
-# event MessageSent:
-#     dstEid: uint32
-#     message: Bytes[MAX_MESSAGE_SIZE]
-#     nativeFee: uint256
-#     lzTokenFee: uint256
-
-
-# event MessageReceived:
-#     srcEid: uint32
-#     sender: bytes32
-#     nonce: uint64
-#     message: Bytes[MAX_MESSAGE_SIZE]
-
-
-# event ReadRequest:
-#     dstEid: uint32
-#     to: address
-#     callData: Bytes[MAX_READ_CALLDATA_SIZE]
-
-
-# event ReadResponse:
-#     srcEid: uint32
-#     response: Bytes[MAX_MESSAGE_SIZE]
-
-
 ################################################################
 #                           CONSTANTS                          #
 ################################################################
 
 # Message size limits
-MAX_MESSAGE_SIZE: public(constant(uint256)) = 512
-MAX_EXTRA_DATA_SIZE: public(constant(uint256)) = 64
-
-# # Read codec constants
-# CMD_VERSION: constant(uint16) = 1
-# REQUEST_VERSION: constant(uint8) = 1
-# RESOLVER_TYPE_SINGLE_VIEW_EVM_CALL: constant(uint16) = 1
+MAX_MESSAGE_SIZE: constant(uint256) = constants.MAX_MESSAGE_SIZE
+MAX_OPTIONS_TOTAL_SIZE: constant(uint256) = constants.MAX_OPTIONS_TOTAL_SIZE
+MAX_EXTRA_DATA_SIZE: constant(uint256) = constants.MAX_EXTRA_DATA_SIZE
 
 # # Misc constants
 # MAX_DVNS: constant(uint8) = 10
@@ -126,10 +86,6 @@ ENDPOINT: public(immutable(ILayerZeroEndpointV2))
 # Remote peers by EID
 peers: public(HashMap[uint32, bytes32])
 
-# # Ordered execution tracking (optional)
-# ordered_nonce: public(bool)
-# max_received_nonce: public(HashMap[uint32, HashMap[bytes32, uint64]])
-
 ################################################################
 #                           STRUCTS                            #
 ################################################################
@@ -138,7 +94,7 @@ struct MessagingParams:
     dstEid: uint32
     receiver: bytes32
     message: Bytes[MAX_MESSAGE_SIZE]
-    options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE]
+    options: Bytes[MAX_OPTIONS_TOTAL_SIZE]
     payInLzToken: bool
 
 
@@ -159,49 +115,10 @@ struct Origin:
     nonce: uint64
 
 
-# struct EVMCallRequestV1:
-#     appRequestLabel: uint16
-#     targetEid: uint32
-#     isBlockNum: bool
-#     blockNumOrTimestamp: uint64
-#     confirmations: uint16
-#     to: address
-#     callData: Bytes[MAX_READ_CALLDATA_SIZE]
-
-
-# # Not using compute for now
-# struct EVMCallComputeV1:
-#     dummy: uint8  # Just to have something in the struct
-
-
 struct SetConfigParam:
     eid: uint32
     configType: uint32
     config: Bytes[1024]
-
-
-# struct ULNConfig:
-#     confirmations: uint64
-#     required_dvn_count: uint8
-#     optional_dvn_count: uint8
-#     optional_dvn_threshold: uint8
-#     required_dvns: DynArray[address, MAX_DVNS]  # Max 10 DVNs
-#     optional_dvns: DynArray[address, MAX_DVNS]  # Max 10 DVNs
-
-
-# struct ULNReadConfig:
-#     executor: address
-#     required_dvn_count: uint8
-#     optional_dvn_count: uint8
-#     optional_dvn_threshold: uint8
-#     required_dvns: DynArray[address, MAX_DVNS]  # Max 10 DVNs
-#     optional_dvns: DynArray[address, MAX_DVNS]  # Max 10 DVNs
-
-
-# struct ULNExecutorConfig:
-#     max_message_size: uint32
-#     executor: address
-
 
 ################################################################
 #                         CONSTRUCTOR                          #
@@ -222,10 +139,6 @@ def __init__(_endpoint: address, _delegate: address):
 
     # Set delegate for endpoint config
     extcall ENDPOINT.setDelegate(_delegate)
-
-    # Set up owner to tx.origin (if deploy via proxy)
-    ownable.__init__()
-    ownable._transfer_ownership(tx.origin)
 
 
 ################################################################
@@ -280,7 +193,8 @@ def setDelegate(_delegate: address):
     @notice Sets the delegate address for the OApp.
     @param _delegate The address of the delegate to be set.
     @dev Only the owner/admin of the OApp can call this function.
-    @dev Provides the ability for a delegate to set configs, on behalf of the OApp, directly on the Endpoint contract.
+    @dev Provides the ability for a delegate to set configs, on behalf of the OApp,
+    directly on the Endpoint contract.
     """
     ownable._check_owner()
 
@@ -310,7 +224,20 @@ def setReadChannel(_channelId: uint32, _active: bool):
 
 # Vyper-specific:
 # oAppVersion - not implemented
-# isComposeMsgSender - not implemented
+
+@external
+def isComposeMsgSender(
+    _origin: Origin, _message: Bytes[MAX_MESSAGE_SIZE], _sender: address
+) -> bool:
+    """
+    @notice Indicates whether an address is an approved composeMsg sender to the Endpoint.
+    @param _origin The origin information containing the source endpoint and sender address.
+    @param _message The lzReceive payload.
+    @param _sender The sender address.
+    @return isSender Is a valid sender.
+    """
+    return _sender == self
+
 
 @view
 @external
@@ -329,6 +256,8 @@ def allowInitializePath(_origin: Origin) -> bool:
 @external
 def nextNonce(_srcEid: uint32, _sender: bytes32) -> uint64:
     """
+    @dev Vyper-specific: If your app relies on ordered execution, you must change this function.
+
     @notice Retrieves the next nonce for a given source endpoint and sender address.
     @dev _srcEid The source endpoint ID.
     @dev _sender The sender address.
@@ -337,8 +266,6 @@ def nextNonce(_srcEid: uint32, _sender: bytes32) -> uint64:
     @dev Is required by the off-chain executor to determine the OApp expects msg execution is ordered.
     @dev This is also enforced by the OApp.
     @dev By default this is NOT enabled. ie. nextNonce is hardcoded to return 0.
-
-    @dev Vyper-specific: If your app relies on ordered execution, you must change this function.
     """
     return 0
 
@@ -378,13 +305,12 @@ def lzReceive(
 # Vyper-specific:
 # oAppVersion - not implemented
 
-
 @view
 @internal
 def _quote(
     _dstEid: uint32,
     _message: Bytes[MAX_MESSAGE_SIZE],
-    _options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE],
+    _options: Bytes[MAX_OPTIONS_TOTAL_SIZE],
     _payInLzToken: bool,
 ) -> MessagingFee:
     """
@@ -415,11 +341,15 @@ def _quote(
 def _lzSend(
     _dstEid: uint32,
     _message: Bytes[MAX_MESSAGE_SIZE],
-    _options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE],
+    _options: Bytes[MAX_OPTIONS_TOTAL_SIZE],
     _fee: MessagingFee,
     _refundAddress: address,
 ) -> MessagingReceipt:
     """
+    @dev Vyper-specific: fees are treated differently than in Solidity OApp.
+        - _payNative and _payLzToken are inlined.
+        - Multiple sends are supported within single transaction (msg.value >= native_fee) instead of '!='.
+
     @dev Internal function to interact with the LayerZero EndpointV2.send() for sending a message.
     @param _dstEid The destination endpoint ID.
     @param _message The message payload.
@@ -432,10 +362,6 @@ def _lzSend(
         - guid: The unique identifier for the sent message.
         - nonce: The nonce of the sent message.
         - fee: The LayerZero fee incurred for the message.
-
-    @dev Vyper-specific: fees are treated differently than in Solidity OApp.
-        - _payNative and _payLzToken are inlined.
-        - Multiple sends are supported within single transaction (msg.value >= native_fee) instead of '!='.
     """
     # Get the peer address for the destination or revert if not set
     peer: bytes32 = self._getPeerOrRevert(_dstEid)
@@ -462,135 +388,3 @@ def _lzSend(
         _refundAddress,
         value=native_fee,
     )
-
-
-# ################################################################
-# #                    CONFIGURATION FUNCTIONS                   #
-# ################################################################
-
-# @external
-# def setConfig(_lib: address, _eid: uint32, _configType: uint32, _config: Bytes[1024]):
-#     """
-#     @notice Set configuration parameters for the endpoint
-#     @param _lib The library address
-#     @param _eid The endpoint ID
-#     @param _configType The configuration type
-#     @param _config The configuration data
-#     """
-#     # Create config param
-#     config_param: SetConfigParam = SetConfigParam(eid=_eid, configType=_configType, config=_config)
-
-#     # Call endpoint to set config
-#     extcall ENDPOINT.setConfig(self, _lib, [config_param])
-
-
-# @external
-# def setSendLibrary(_eid: uint32, _lib: address):
-#     """
-#     @notice Set the send library for a specific endpoint
-#     @param _eid The endpoint ID
-#     @param _lib The send library address
-#     """
-#     extcall ENDPOINT.setSendLibrary(self, _eid, _lib)
-
-
-# @external
-# def setReceiveLibrary(_eid: uint32, _lib: address, _gracePeriod: uint256 = 0):
-#     """
-#     @notice Set the receive library for a specific endpoint
-#     @param _eid The endpoint ID
-#     @param _lib The receive library address
-#     @param _gracePeriod The grace period for the library change
-#     """
-#     extcall ENDPOINT.setReceiveLibrary(self, _eid, _lib, _gracePeriod)
-
-
-# @external
-# def setULNConfig(
-#     _eid: uint32,
-#     _lib: address,
-#     _configType: uint32,
-#     _confirmations: uint64,
-#     _required_dvns: DynArray[address, MAX_DVNS],
-#     _optional_dvns: DynArray[address, MAX_DVNS],
-#     _optional_dvn_threshold: uint8,
-#     _executor: address = empty(address),
-# ):
-#     """
-#     @notice Set ULN configuration for a specific endpoint
-#     @param _eid The endpoint ID
-#     @param _lib The library address
-#     @param _configType The configuration type
-#     @param _confirmations The number of confirmations required
-#     @param _required_dvns List of required DVN addresses
-#     @param _optional_dvns List of optional DVN addresses
-#     @param _optional_dvn_threshold Optional DVN threshold
-#     @param _executor Executor address
-#     """
-#     # Prepare ULN config
-#     required_count: uint8 = convert(len(_required_dvns), uint8)
-#     optional_count: uint8 = convert(len(_optional_dvns), uint8)
-#     assert _optional_dvn_threshold <= optional_count, "Invalid DVN threshold"
-
-#     # Declare config_param outside of if/else
-#     config_param: SetConfigParam = empty(SetConfigParam)
-
-#     # For read config
-#     if _eid > READ_CHANNEL_THRESHOLD:
-#         uln_config: ULNReadConfig = ULNReadConfig(
-#             executor=_executor,
-#             required_dvn_count=required_count,
-#             optional_dvn_count=optional_count,
-#             optional_dvn_threshold=_optional_dvn_threshold,
-#             required_dvns=_required_dvns,
-#             optional_dvns=_optional_dvns,
-#         )
-#         config_param = SetConfigParam(
-#             eid=_eid, configType=_configType, config=abi_encode(uln_config)
-#         )
-#     else:
-#         # For regular config
-#         uln_config: ULNConfig = ULNConfig(
-#             confirmations=_confirmations,
-#             required_dvn_count=required_count,
-#             optional_dvn_count=optional_count,
-#             optional_dvn_threshold=_optional_dvn_threshold,
-#             required_dvns=_required_dvns,
-#             optional_dvns=_optional_dvns,
-#         )
-#         config_param = SetConfigParam(
-#             eid=_eid, configType=_configType, config=abi_encode(uln_config)
-#         )
-
-
-#     # Call endpoint to set config
-#     extcall ENDPOINT.setConfig(self, _lib, [config_param])
-
-#     # Set executor config if provided for normal channels
-#     if _executor != empty(address) and _eid <= READ_CHANNEL_THRESHOLD:
-#         executor_config: ULNExecutorConfig = ULNExecutorConfig(
-#             max_message_size=1024, executor=_executor
-#         )
-
-#         # Reuse config_param for executor config
-#         config_param = SetConfigParam(
-#             eid=_eid, configType=1, config=abi_encode(executor_config)  # 1 = ULN executor config
-#         )
-#         extcall ENDPOINT.setConfig(self, _lib, [config_param])
-
-
-################################################################
-#                     Offspec Utilities                        #
-################################################################
-
-@external
-def skipInboundNonce(_srcEid: uint32, _sender: bytes32, _nonce: uint64):
-    """
-    @notice Owner function to skip nonce (in case of stuck messages)
-    @param _srcEid The source endpoint ID
-    @param _sender The sender bytes32 address
-    @param _nonce The nonce to skip
-    """
-    ownable._check_owner()
-
-    extcall ENDPOINT.skip(self, _srcEid, _sender, _nonce)

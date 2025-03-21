@@ -1,7 +1,6 @@
 # pragma version 0.4.1
 
 """
-
 @license Copyright (c) Curve.Fi, 2025 - all rights reserved
 
 @author curve.fi
@@ -9,13 +8,13 @@
 @custom:security security@curve.fi
 """
 
+# Vyper-specific constants
+from . import VyperConstants as constants
+
+
 ################################################################
 #                           CONSTANTS                          #
 ################################################################
-
-# Options size limits
-MAX_OPTIONS_TOTAL_SIZE: constant(uint256) = 256
-MAX_OPTION_SINGLE_SIZE: constant(uint256) = 64
 
 # LayerZero protocol constants
 TYPE_1: constant(uint16) = 1
@@ -43,22 +42,22 @@ OPTION_TYPE_DVN_PRECRIME: constant(uint8) = 1
 # Includes partial implementation of ExecutorOptions.sol
 
 @internal
-def newOptions() -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
+def newOptions() -> Bytes[constants.MAX_OPTIONS_TOTAL_SIZE]:
     """
     @notice Creates a new options container with type 3.
     @return options The newly created options container.
     """
-    options: Bytes[MAX_OPTIONS_TOTAL_SIZE] = concat(convert(TYPE_3, bytes2), b"")
+    options: Bytes[constants.MAX_OPTIONS_TOTAL_SIZE] = concat(convert(TYPE_3, bytes2), b"")
 
     return options
 
 
 @internal
 def addExecutorOption(
-    _options: Bytes[MAX_OPTIONS_TOTAL_SIZE],
+    _options: Bytes[constants.MAX_OPTIONS_TOTAL_SIZE],
     _optionType: uint8,
-    _option: Bytes[MAX_OPTION_SINGLE_SIZE],
-) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
+    _option: Bytes[constants.MAX_OPTION_SINGLE_SIZE],
+) -> Bytes[constants.MAX_OPTIONS_TOTAL_SIZE]:
     """
     @dev Adds an executor option to the existing options.
     @param _options The existing options container.
@@ -67,11 +66,13 @@ def addExecutorOption(
     @return options The updated options container.
     """
     assert convert(slice(_options, 0, 2), uint16) == TYPE_3, "OApp: invalid option type"
-    assert len(_options) + len(_option) <= MAX_OPTIONS_TOTAL_SIZE, "OApp: options size exceeded"
+    assert (
+        len(_options) + len(_option) <= constants.MAX_OPTIONS_TOTAL_SIZE
+    ), "OApp: options size exceeded"
 
     return concat(
         abi_decode(
-            abi_encode(_options), (Bytes[MAX_OPTIONS_TOTAL_SIZE - MAX_OPTION_SINGLE_SIZE - 4])
+            abi_encode(_options), (Bytes[constants.MAX_OPTIONS_TOTAL_SIZE - constants.MAX_OPTION_SINGLE_SIZE - 4])
         ),  # -4 for header
         convert(EXECUTOR_WORKER_ID, bytes1),
         convert(convert(len(_option) + 1, uint16), bytes2),  # +1 for optionType
@@ -82,8 +83,8 @@ def addExecutorOption(
 
 @internal
 def addExecutorLzReceiveOption(
-    _options: Bytes[MAX_OPTIONS_TOTAL_SIZE], _gas: uint128, _value: uint128
-) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
+    _options: Bytes[constants.MAX_OPTIONS_TOTAL_SIZE], _gas: uint128, _value: uint128
+) -> Bytes[constants.MAX_OPTIONS_TOTAL_SIZE]:
     """
     @notice Adds an executor LZ receive option to the existing options.
     @param _options The existing options container.
@@ -97,7 +98,7 @@ def addExecutorLzReceiveOption(
     @dev Vyper-specific: ExecutorOptions.encodeLzReceiveOption is inlined here.
     OnlyType3 is not checked here as it is checked in addExecutorOption.
     """
-    option: Bytes[MAX_OPTION_SINGLE_SIZE] = b""
+    option: Bytes[constants.MAX_OPTION_SINGLE_SIZE] = b""
     gas_bytes: bytes16 = convert(_gas, bytes16)
 
     if _value > 0:
@@ -111,8 +112,8 @@ def addExecutorLzReceiveOption(
 
 @internal
 def addExecutorNativeDropOption(
-    _options: Bytes[MAX_OPTIONS_TOTAL_SIZE], _amount: uint128, _receiver: bytes32
-) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
+    _options: Bytes[constants.MAX_OPTIONS_TOTAL_SIZE], _amount: uint128, _receiver: bytes32
+) -> Bytes[constants.MAX_OPTIONS_TOTAL_SIZE]:
     """
     @dev Adds an executor native drop option to the existing options.
     @param _options The existing options container.
@@ -121,15 +122,18 @@ def addExecutorNativeDropOption(
     @return options The updated options container.
     @dev When multiples of this option are added, they are summed by the executor on the remote chain.
     """
-    option: Bytes[MAX_OPTION_SINGLE_SIZE] = concat(convert(_amount, bytes16), _receiver)
+    option: Bytes[constants.MAX_OPTION_SINGLE_SIZE] = concat(convert(_amount, bytes16), _receiver)
 
     return self.addExecutorOption(_options, OPTION_TYPE_NATIVE_DROP, option)
 
 
 @internal
 def addExecutorLzComposeOption(
-    _options: Bytes[MAX_OPTIONS_TOTAL_SIZE], _index: uint16, _gas: uint128, _value: uint128
-) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
+    _options: Bytes[constants.MAX_OPTIONS_TOTAL_SIZE],
+    _index: uint16,
+    _gas: uint128,
+    _value: uint128,
+) -> Bytes[constants.MAX_OPTIONS_TOTAL_SIZE]:
     """
     @dev Adds an executor LZ compose option to the existing options.
     @param _options The existing options container.
@@ -141,7 +145,7 @@ def addExecutorLzComposeOption(
     @dev If the OApp sends N lzCompose calls on the remote, you must provide N incremented indexes starting with 0.
     @dev ie. When your remote OApp composes (N = 3) messages, you must set this option for index 0,1,2
     """
-    option: Bytes[MAX_OPTION_SINGLE_SIZE] = b""
+    option: Bytes[constants.MAX_OPTION_SINGLE_SIZE] = b""
 
     index_bytes: bytes2 = convert(_index, bytes2)
     gas_bytes: bytes16 = convert(_gas, bytes16)
@@ -157,8 +161,8 @@ def addExecutorLzComposeOption(
 
 @internal
 def addExecutorOrderedExecutionOption(
-    _options: Bytes[MAX_OPTIONS_TOTAL_SIZE],
-) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
+    _options: Bytes[constants.MAX_OPTIONS_TOTAL_SIZE],
+) -> Bytes[constants.MAX_OPTIONS_TOTAL_SIZE]:
     """
     @dev Adds an executor ordered execution option to the existing options.
     @param _options The existing options container.
@@ -169,8 +173,8 @@ def addExecutorOrderedExecutionOption(
 
 @internal
 def addExecutorLzReadOption(
-    _options: Bytes[MAX_OPTIONS_TOTAL_SIZE], _gas: uint128, _size: uint32, _value: uint128
-) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
+    _options: Bytes[constants.MAX_OPTIONS_TOTAL_SIZE], _gas: uint128, _size: uint32, _value: uint128
+) -> Bytes[constants.MAX_OPTIONS_TOTAL_SIZE]:
     """
     @dev Adds an executor LZ read option to the existing options.
     @param _options The existing options container.
@@ -179,7 +183,7 @@ def addExecutorLzReadOption(
     @param _value The msg.value for the lzRead() function call.
     @return options The updated options container.
     """
-    option: Bytes[MAX_OPTION_SINGLE_SIZE] = b""
+    option: Bytes[constants.MAX_OPTION_SINGLE_SIZE] = b""
 
     gas_bytes: bytes16 = convert(_gas, bytes16)
     size_bytes: bytes4 = convert(_size, bytes4)
@@ -195,11 +199,11 @@ def addExecutorLzReadOption(
 
 @internal
 def addDVNOption(
-    _options: Bytes[MAX_OPTIONS_TOTAL_SIZE],
+    _options: Bytes[constants.MAX_OPTIONS_TOTAL_SIZE],
     _dvnIdx: uint8,
     _optionType: uint8,
-    _option: Bytes[MAX_OPTION_SINGLE_SIZE],
-) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
+    _option: Bytes[constants.MAX_OPTION_SINGLE_SIZE],
+) -> Bytes[constants.MAX_OPTIONS_TOTAL_SIZE]:
     """
     @dev Adds a DVN option to the existing options.
     @param _options The existing options container.
@@ -209,11 +213,13 @@ def addDVNOption(
     @return options The updated options container.
     """
     assert convert(slice(_options, 0, 2), uint16) == TYPE_3, "OApp: invalid option type"
-    assert len(_options) + len(_option) <= MAX_OPTIONS_TOTAL_SIZE, "OApp: options size exceeded"
+    assert (
+        len(_options) + len(_option) <= constants.MAX_OPTIONS_TOTAL_SIZE
+    ), "OApp: options size exceeded"
 
     return concat(
         abi_decode(
-            abi_encode(_options), (Bytes[MAX_OPTIONS_TOTAL_SIZE - MAX_OPTION_SINGLE_SIZE - 5])
+            abi_encode(_options), (Bytes[constants.MAX_OPTIONS_TOTAL_SIZE - constants.MAX_OPTION_SINGLE_SIZE - 5])
         ),  # -5 for header
         convert(DVN_WORKER_ID, bytes1),
         convert(convert(len(_option) + 2, uint16), bytes2),  # +2 for optionType and dvnIdx
@@ -225,8 +231,8 @@ def addDVNOption(
 
 @internal
 def addDVNPreCrimeOption(
-    _options: Bytes[MAX_OPTIONS_TOTAL_SIZE], _dvnIdx: uint8
-) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
+    _options: Bytes[constants.MAX_OPTIONS_TOTAL_SIZE], _dvnIdx: uint8
+) -> Bytes[constants.MAX_OPTIONS_TOTAL_SIZE]:
     """
     @dev Adds a DVN pre-crime option to the existing options.
     @param _options The existing options container.
