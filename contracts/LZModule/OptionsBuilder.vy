@@ -45,6 +45,7 @@ OPTION_TYPE_DVN_PRECRIME: constant(uint8) = 1
 # Includes partial implementation of ExecutorOptions.sol
 
 @internal
+@pure
 def newOptions() -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
     """
     @notice Creates a new options container with type 3.
@@ -56,6 +57,7 @@ def newOptions() -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
 
 
 @internal
+@pure
 def addExecutorOption(
     _options: Bytes[MAX_OPTIONS_TOTAL_SIZE],
     _optionType: uint8,
@@ -83,6 +85,7 @@ def addExecutorOption(
 
 
 @internal
+@pure
 def addExecutorLzReceiveOption(
     _options: Bytes[MAX_OPTIONS_TOTAL_SIZE], _gas: uint128, _value: uint128
 ) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
@@ -112,6 +115,7 @@ def addExecutorLzReceiveOption(
 
 
 @internal
+@pure
 def addExecutorNativeDropOption(
     _options: Bytes[MAX_OPTIONS_TOTAL_SIZE], _amount: uint128, _receiver: bytes32
 ) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
@@ -129,6 +133,7 @@ def addExecutorNativeDropOption(
 
 
 @internal
+@pure
 def addExecutorLzComposeOption(
     _options: Bytes[MAX_OPTIONS_TOTAL_SIZE],
     _index: uint16,
@@ -161,6 +166,7 @@ def addExecutorLzComposeOption(
 
 
 @internal
+@pure
 def addExecutorOrderedExecutionOption(
     _options: Bytes[MAX_OPTIONS_TOTAL_SIZE],
 ) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
@@ -173,6 +179,7 @@ def addExecutorOrderedExecutionOption(
 
 
 @internal
+@pure
 def addExecutorLzReadOption(
     _options: Bytes[MAX_OPTIONS_TOTAL_SIZE], _gas: uint128, _size: uint32, _value: uint128
 ) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:
@@ -199,6 +206,7 @@ def addExecutorLzReadOption(
 
 
 @internal
+@pure
 def addDVNOption(
     _options: Bytes[MAX_OPTIONS_TOTAL_SIZE],
     _dvnIdx: uint8,
@@ -229,6 +237,7 @@ def addDVNOption(
 
 
 @internal
+@pure
 def addDVNPreCrimeOption(
     _options: Bytes[MAX_OPTIONS_TOTAL_SIZE], _dvnIdx: uint8
 ) -> Bytes[MAX_OPTIONS_TOTAL_SIZE]:

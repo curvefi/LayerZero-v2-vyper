@@ -29,9 +29,8 @@ To use lzRead functionality, you must use ReadCmdCodecV1.vy to encode read reque
 #                            MODULES                           #
 ################################################################
 
-# Import ownership management. Defer initialization to main contract.
+# Import ownership management. Must be initialized in main contract.
 from snekmate.auth import ownable
-
 uses: ownable
 
 # Vyper-specific constants
@@ -71,10 +70,8 @@ MAX_MESSAGE_SIZE: constant(uint256) = constants.MAX_MESSAGE_SIZE
 MAX_OPTIONS_TOTAL_SIZE: constant(uint256) = constants.MAX_OPTIONS_TOTAL_SIZE
 MAX_EXTRA_DATA_SIZE: constant(uint256) = constants.MAX_EXTRA_DATA_SIZE
 
-# # Misc constants
-# MAX_DVNS: constant(uint8) = 10
-# MAX_PEERS: constant(uint256) = 128
-# MAX_READ_REQUESTS: constant(uint256) = 16
+# Offspec constant, useful for read messages detection
+READ_CHANNEL_THRESHOLD: constant(uint32) = 4294965694  # max(uint32)-1601, 1600 channels reserved for read
 
 # Core contract state (immutable)
 ENDPOINT: public(immutable(ILayerZeroEndpointV2))

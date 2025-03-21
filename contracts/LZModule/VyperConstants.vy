@@ -20,9 +20,8 @@ MAX_MESSAGE_SIZE: constant(uint256) = 512
 MAX_EXTRA_DATA_SIZE: constant(uint256) = 64
 
 # ReadCmdCodecV1 limits
-MAX_CMD_SIZE: constant(uint256) = 1024
-MAX_CALLDATA_SIZE: constant(uint256) = 256
-MAX_EVM_CALL_REQUESTS: constant(uint256) = 16
+MAX_CALLDATA_SIZE: constant(uint256) = 64
+MAX_EVM_CALL_REQUESTS: constant(uint256) = 4
 
 # ConfigUtils limits
 MAX_DVNS: constant(uint256) = 16

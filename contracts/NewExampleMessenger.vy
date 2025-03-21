@@ -32,7 +32,14 @@ exports: (
 # LayerZero module
 from LZModule import OApp
 initializes: OApp[ownable:=ownable]
-
+exports: (
+    OApp.setPeer,
+    OApp.setDelegate,
+    OApp.setReadChannel,
+    OApp.isComposeMsgSender,
+    OApp.allowInitializePath,
+    OApp.nextNonce
+)
 from LZModule import OAppConfigUtils
 initializes: OAppConfigUtils[ownable:=ownable]
 
@@ -46,7 +53,7 @@ from LZModule import ReadCmdCodecV1
 event MessageSent:
     destination: uint32
     payload: String[128]
-    fees: uint256
+    fees: OApp.MessagingFee
 
 
 event MessageReceived:
@@ -94,83 +101,103 @@ def withdraw_eth(_amount: uint256):
     send(msg.sender, _amount)
 
 
-# ################################################################
-# #                    MESSAGING FUNCTIONS                       #
-# ################################################################
+################################################################
+#                    MESSAGING FUNCTIONS                       #
+# ##############################################################
 
-# @view
-# @external
-# def quote_message_fee(
-#     _dst_eid: uint32,
-#     _receiver: address,
-#     _message: String[128],
-#     _gas_limit: uint256 = 0,
-#     _value: uint256 = 0,
-# ) -> uint256:
-#     """
-#     @notice Quote fee for sending message
-#     """
+@view
+@external
+def quote_message_fee(
+    _dst_eid: uint32,
+    _receiver: address,
+    _message: String[128],
+    _gas_limit: uint128 = 0,
+    _value: uint128 = 0,
+    _pay_in_lz_token: bool = False,
+) -> OApp.MessagingFee:
 
-#     encoded: Bytes[OApp.MAX_MESSAGE_SIZE] = convert(_message, Bytes[OApp.MAX_MESSAGE_SIZE])
-#     return OApp._quote_lz_fee(_dst_eid, _receiver, encoded, _gas_limit, _value)
+    # step 1: convert message to bytes
+    encoded_message: Bytes[OApp.MAX_MESSAGE_SIZE] = convert(_message, Bytes[OApp.MAX_MESSAGE_SIZE])
+
+    # step 2: create options using OptionsBuilder module
+    options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
+    options = OptionsBuilder.addExecutorLzReceiveOption(options, _gas_limit, _value)
+
+    # step 3: quote fee
+    return OApp._quote(_dst_eid, encoded_message, options, _pay_in_lz_token)
+
+@payable
+@external
+def send_message(
+    _dst_eid: uint32,
+    _receiver: address,
+    _message: String[128],
+    _gas_limit: uint128 = 0,
+    _value: uint128 = 0,
+    _lz_token_fee: uint256 = 0,
+):
+    """
+    @notice Send a string message to contract on another chain
+    @param _dst_eid Destination chain ID
+    @param _receiver Target contract address
+    @param _message String message to send
+    @param _gas_limit Optional gas limit override
+    @param _value Optional value to send with message
+    """
+    # step 1: convert message to bytes
+    encoded_message: Bytes[OApp.MAX_MESSAGE_SIZE] = convert(_message, Bytes[OApp.MAX_MESSAGE_SIZE])
+
+    # step 2: create options using OptionsBuilder module
+    options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
+    options = OptionsBuilder.addExecutorLzReceiveOption(options, _gas_limit, _value)
+
+    # # step 3: send message
+    fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=msg.value, lzTokenFee=_lz_token_fee)
+    OApp._lzSend(
+        _dst_eid,
+        encoded_message,
+        options,
+        fees,
+        msg.sender
+    )
+
+    log MessageSent(destination=_dst_eid, payload=_message, fees=fees)
 
 
-# @payable
-# @external
-# def send_message(
-#     _dst_eid: uint32,
-#     _receiver: address,
-#     _message: String[128],
-#     _gas_limit: uint256 = 0,
-#     _value: uint256 = 0,
-#     _check_fee: bool = False,
-# ):
-#     """
-#     @notice Send a string message to contract on another chain
-#     @param _dst_eid Destination chain ID
-#     @param _receiver Target contract address
-#     @param _message String message to send
-#     @param _gas_limit Optional gas limit override
-#     @param _value Optional value to send with message
-#     """
+@view
+@external
+def quote_read_fee(
+    _dst_eid: uint32,
+    _target: address,
+    _calldata: Bytes[ReadCmdCodecV1.MAX_CALLDATA_SIZE],
+    _gas_limit: uint128 = 0,
+    _expected_response_size: uint32 = 64,
+    _value: uint128 = 0,
+    _pay_in_lz_token: bool = False,
+) -> OApp.MessagingFee:
+    """
+    @notice Quote fee for read request
+    """
+    # step 1: prepare read message using ReadCmdCodecV1 module
+    # A: prepare ReadCmdRequestV1 struct
+    request: ReadCmdCodecV1.EVMCallRequestV1 = ReadCmdCodecV1.EVMCallRequestV1(
+        appRequestLabel=1,
+        targetEid=_dst_eid,
+        isBlockNum=False,
+        blockNumOrTimestamp=convert(block.timestamp, uint64),
+        confirmations=0,
+        to=_target,
+        callData=_calldata
+    )
+    # B: encode request
+    encoded_message: Bytes[ReadCmdCodecV1.MAX_CMD_SIZE] = ReadCmdCodecV1.encode(1, [request])
 
-#     encoded: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = convert(_message, Bytes[lz.LZ_MESSAGE_SIZE_CAP])
-#     lz._send_message(
-#         _dst_eid,  # _dstEid
-#         convert(_receiver, bytes32),  # _receiver
-#         encoded,  # _message
-#         _gas_limit,  # _gas_limit: Use default gas limit
-#         _value,  # _lz_receive_value: No value to attach to receive call
-#         0,  # _data_size: Zero data size (not a read)
-#         msg.value,  # _request_msg_value
-#         msg.sender,  # _refund_address
-#         False,  # _perform_fee_check: No fee check
-#     )
+    # step 2: create options using OptionsBuilder module
+    options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
+    options = OptionsBuilder.addExecutorLzReadOption(options, _gas_limit, _expected_response_size, _value)
 
-#     log MessageSent(_dst_eid, _message, msg.value)
-
-
-# @view
-# @external
-# def quote_read_fee(
-#     _dst_eid: uint32,
-#     _target: address,
-#     _calldata: Bytes[128],
-#     _gas_limit: uint256 = 0,
-#     _value: uint256 = 0,
-#     _data_size: uint32 = 64,
-# ) -> uint256:
-#     """
-#     @notice Quote fee for read request
-#     """
-
-#     message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = lz._prepare_read_message_bytes(
-#         _dst_eid, _target, _calldata
-#     )
-
-#     return lz._quote_lz_fee(
-#         lz.LZ_READ_CHANNEL, empty(address), message, _gas_limit, _value, _data_size
-#     )
+    # step 3: quote fee
+    return OApp._quote(_dst_eid, encoded_message, options, _pay_in_lz_token)
 
 
 # @payable
@@ -250,11 +277,11 @@ def withdraw_eth(_amount: uint256):
 #     return 2 * _input
 
 
-# @external
-# @payable
-# def __default__():
-#     """
-#     @notice Default function to receive ETH
-#     @dev This is needed to receive refunds from LayerZero
-#     """
-#     pass
+@external
+@payable
+def __default__():
+    """
+    @notice Default function to receive ETH
+    @dev This might be needed to receive refunds from LayerZero (for complex lzsend/receive patterns)
+    """
+    pass

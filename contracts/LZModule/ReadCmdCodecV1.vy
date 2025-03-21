@@ -17,10 +17,14 @@ from . import VyperConstants as constants
 #                           CONSTANTS                          #
 ################################################################
 
-
-MAX_CMD_SIZE: constant(uint256) = constants.MAX_CMD_SIZE
+# Vyper Byte size limits
 MAX_CALLDATA_SIZE: constant(uint256) = constants.MAX_CALLDATA_SIZE
 MAX_EVM_CALL_REQUESTS: constant(uint256) = constants.MAX_EVM_CALL_REQUESTS
+
+MAX_CMD_SIZE: constant(uint256) = MAX_EVM_CALL_REQUESTS * (MAX_CALLDATA_SIZE + 42) + 6 + 39
+# 42 is per-call header length, see appendEVMCallRequestV1,
+# +6 is general header, see encode()
+# +39 is single compute command length, see appendEVMCallComputeV1
 
 # Read codec constants
 CMD_VERSION: constant(uint16) = 1
@@ -96,8 +100,11 @@ def encode(
     _evmCallRequests: DynArray[EVMCallRequestV1, MAX_EVM_CALL_REQUESTS],
     _evmCallCompute: EVMCallComputeV1 = empty(EVMCallComputeV1),
 ) -> Bytes[MAX_CMD_SIZE]:
-    cmd: Bytes[MAX_CMD_SIZE] = b""
-
+    cmd: Bytes[MAX_CMD_SIZE] = concat(
+        convert(CMD_VERSION, bytes2),
+        convert(_appCmdLabel, bytes2),
+        convert(convert(len(_evmCallRequests), uint16), bytes2),
+    )
     for call_request: EVMCallRequestV1 in _evmCallRequests:
         cmd = self.appendEVMCallRequestV1(cmd, call_request)
 
