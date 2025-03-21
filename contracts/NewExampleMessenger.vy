@@ -52,24 +52,24 @@ from LZModule import ReadCmdCodecV1
 
 event MessageSent:
     destination: uint32
-    payload: String[128]
+    payload: String[OApp.MAX_MESSAGE_SIZE]
     fees: OApp.MessagingFee
 
 
 event MessageReceived:
     source: uint32
-    payload: String[128]
+    payload: String[OApp.MAX_MESSAGE_SIZE]
 
 
 event ReadRequestSent:
     destination: uint32
     target: address
-    payload: Bytes[128]
+    payload: Bytes[ReadCmdCodecV1.MAX_CMD_SIZE]
 
 
 event ReadResponseReceived:
     source: uint32
-    response: String[128]
+    response: String[OApp.MAX_MESSAGE_SIZE]
 
 
 ################################################################
@@ -171,17 +171,18 @@ def quote_read_fee(
     _target: address,
     _calldata: Bytes[ReadCmdCodecV1.MAX_CALLDATA_SIZE],
     _gas_limit: uint128 = 0,
-    _expected_response_size: uint32 = 64,
     _value: uint128 = 0,
+    _expected_response_size: uint32 = 64,
     _pay_in_lz_token: bool = False,
 ) -> OApp.MessagingFee:
     """
     @notice Quote fee for read request
     """
+
     # step 1: prepare read message using ReadCmdCodecV1 module
     # A: prepare ReadCmdRequestV1 struct
     request: ReadCmdCodecV1.EVMCallRequestV1 = ReadCmdCodecV1.EVMCallRequestV1(
-        appRequestLabel=1,
+        appRequestLabel=0,
         targetEid=_dst_eid,
         isBlockNum=False,
         blockNumOrTimestamp=convert(block.timestamp, uint64),
@@ -190,7 +191,7 @@ def quote_read_fee(
         callData=_calldata
     )
     # B: encode request
-    encoded_message: Bytes[ReadCmdCodecV1.MAX_CMD_SIZE] = ReadCmdCodecV1.encode(1, [request])
+    encoded_message: Bytes[ReadCmdCodecV1.MAX_CMD_SIZE] = ReadCmdCodecV1.encode(0, [request])
 
     # step 2: create options using OptionsBuilder module
     options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
@@ -200,27 +201,58 @@ def quote_read_fee(
     return OApp._quote(_dst_eid, encoded_message, options, _pay_in_lz_token)
 
 
-# @payable
-# @external
-# def request_read(
-#     _dst_eid: uint32,
-#     _target: address,
-#     _calldata: Bytes[128],
-#     _gas_limit: uint256 = 0,
-#     _value: uint256 = 0,
-#     _data_size: uint32 = 64,
-#     _check_fee: bool = False,
-# ):
-#     """
-#     @notice Send read request to another chain
-#     @param _dst_eid Target chain endpoint ID
-#     @param _target Contract to read from
-#     @param _calldata Function call data
-#     @param _gas_limit Optional gas limit
-#     @param _value Optional value to send with message
-#     @param _data_size Expected response size
-#     @param _check_fee Validate sufficent fee before sending
-#     """
+@payable
+@external
+def request_read(
+    _dst_eid: uint32,
+    _target: address,
+    _calldata: Bytes[ReadCmdCodecV1.MAX_CALLDATA_SIZE],
+    _gas_limit: uint128 = 0,
+    _value: uint128 = 0,
+    _expected_response_size: uint32 = 64,
+    _lz_token_fee: uint256 = 0,
+):
+    """
+    @notice Send read request to another chain
+    @param _dst_eid Target chain endpoint ID
+    @param _target Contract to read from
+    @param _calldata Function call data
+    @param _gas_limit Optional gas limit
+    @param _value Optional value to send with message
+    @param _expected_response_size Expected response size
+    @param _lz_token_fee Optional LZ token fee
+    """
+
+    # step 1: prepare read message using ReadCmdCodecV1 module
+    # A: prepare ReadCmdRequestV1 struct
+    request: ReadCmdCodecV1.EVMCallRequestV1 = ReadCmdCodecV1.EVMCallRequestV1(
+        appRequestLabel=0,
+        targetEid=_dst_eid,
+        isBlockNum=False,
+        blockNumOrTimestamp=convert(block.timestamp, uint64),
+        confirmations=0,
+        to=_target,
+        callData=_calldata
+    )
+
+    # B: encode request
+    encoded_message: Bytes[ReadCmdCodecV1.MAX_CMD_SIZE] = ReadCmdCodecV1.encode(0, [request])
+
+    # C: create options using OptionsBuilder module
+    options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
+    options = OptionsBuilder.addExecutorLzReadOption(options, _gas_limit, _expected_response_size, _value)
+
+    # D: send message
+    fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=msg.value, lzTokenFee=_lz_token_fee)
+    OApp._lzSend(
+        _dst_eid,
+        encoded_message,
+        options,
+        fees,
+        msg.sender
+    )
+
+    log ReadRequestSent(destination=_dst_eid, target=_target, payload=encoded_message)
 
 #     # Prepare read message
 #     message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = lz._prepare_read_message_bytes(
