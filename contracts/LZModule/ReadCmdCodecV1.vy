@@ -17,6 +17,11 @@ from . import VyperConstants as constants
 #                           CONSTANTS                          #
 ################################################################
 
+
+MAX_CMD_SIZE: constant(uint256) = constants.MAX_CMD_SIZE
+MAX_CALLDATA_SIZE: constant(uint256) = constants.MAX_CALLDATA_SIZE
+MAX_EVM_CALL_REQUESTS: constant(uint256) = constants.MAX_EVM_CALL_REQUESTS
+
 # Read codec constants
 CMD_VERSION: constant(uint16) = 1
 REQUEST_VERSION: constant(uint8) = 1
@@ -31,12 +36,6 @@ COMPUTE_SETTING_REDUCE_ONLY: constant(uint8) = 1
 COMPUTE_SETTING_MAP_REDUCE: constant(uint8) = 2
 COMPUTE_SETTING_NONE: constant(uint8) = 3
 
-# Read channel threshold
-READ_CHANNEL_THRESHOLD: constant(
-    uint32
-) = 4294965694  # max(uint32)-1601, 1600 channels reserved for read
-
-
 ################################################################
 #                           STRUCTS                            #
 ################################################################
@@ -48,7 +47,7 @@ struct EVMCallRequestV1:
     blockNumOrTimestamp: uint64  # Block number or timestamp to use in the request
     confirmations: uint16  # Number of block confirmations on top of the requested block number or timestamp before the view function can be called
     to: address  # Address of the target contract on the target chain
-    callData: Bytes[constants.MAX_CALLDATA_SIZE]  # Calldata for the contract call
+    callData: Bytes[MAX_CALLDATA_SIZE]  # Calldata for the contract call
 
 
 struct EVMCallComputeV1:
@@ -72,7 +71,7 @@ struct EVMCallComputeV1:
 
 @internal
 @pure
-def _decodeCmdAppLabel(_cmd: Bytes[constants.MAX_CMD_SIZE]) -> uint16:
+def _decodeCmdAppLabel(_cmd: Bytes[MAX_CMD_SIZE]) -> uint16:
     offset: uint256 = 0
     cmdVersion: uint16 = abi_decode(abi_encode(slice(_cmd, offset, offset + 2)), uint16)
     offset += 2
@@ -82,7 +81,7 @@ def _decodeCmdAppLabel(_cmd: Bytes[constants.MAX_CMD_SIZE]) -> uint16:
 
 @internal
 @pure
-def _decodeRequestV1AppRequestLabel(_request: Bytes[constants.MAX_CMD_SIZE]) -> uint16:
+def _decodeRequestV1AppRequestLabel(_request: Bytes[MAX_CMD_SIZE]) -> uint16:
     offset: uint256 = 0
     requestVersion: uint8 = abi_decode(abi_encode(slice(_request, offset, offset + 1)), uint8)
     offset += 1
@@ -94,10 +93,10 @@ def _decodeRequestV1AppRequestLabel(_request: Bytes[constants.MAX_CMD_SIZE]) -> 
 @pure
 def encode(
     _appCmdLabel: uint16,
-    _evmCallRequests: DynArray[EVMCallRequestV1, constants.MAX_EVM_CALL_REQUESTS],
+    _evmCallRequests: DynArray[EVMCallRequestV1, MAX_EVM_CALL_REQUESTS],
     _evmCallCompute: EVMCallComputeV1 = empty(EVMCallComputeV1),
-) -> Bytes[constants.MAX_CMD_SIZE]:
-    cmd: Bytes[constants.MAX_CMD_SIZE] = b""
+) -> Bytes[MAX_CMD_SIZE]:
+    cmd: Bytes[MAX_CMD_SIZE] = b""
 
     for call_request: EVMCallRequestV1 in _evmCallRequests:
         cmd = self.appendEVMCallRequestV1(cmd, call_request)
@@ -110,8 +109,8 @@ def encode(
 @internal
 @pure
 def appendEVMCallRequestV1(
-    _cmd: Bytes[constants.MAX_CMD_SIZE], _request: EVMCallRequestV1
-) -> Bytes[constants.MAX_CMD_SIZE]:
+    _cmd: Bytes[MAX_CMD_SIZE], _request: EVMCallRequestV1
+) -> Bytes[MAX_CMD_SIZE]:
     """
     @notice Appends an EVM call request to the command
     @param _cmd The existing command bytes
@@ -120,15 +119,11 @@ def appendEVMCallRequestV1(
     """
 
     # dev: assert that appending new request to existing command will not exceed the max size
-    assert (
-        len(_cmd) + constants.MAX_CALLDATA_SIZE + 42 <= constants.MAX_CMD_SIZE
-    ), "OApp: Command too large"
+    assert (len(_cmd) + MAX_CALLDATA_SIZE + 42 <= MAX_CMD_SIZE), "OApp: Command too large"
     # dev: 42 is length of all fields excluding existing command and callData
     return concat(
         # current cmd
-        abi_decode(
-            abi_encode(_cmd), (Bytes[constants.MAX_CMD_SIZE - constants.MAX_CALLDATA_SIZE - 42])
-        ),
+        abi_decode(abi_encode(_cmd), (Bytes[MAX_CMD_SIZE - MAX_CALLDATA_SIZE - 42])),
         # newCmd
         convert(REQUEST_VERSION, bytes1),
         convert(_request.appRequestLabel, bytes2),
@@ -147,8 +142,8 @@ def appendEVMCallRequestV1(
 @internal
 @pure
 def appendEVMCallComputeV1(
-    _cmd: Bytes[constants.MAX_CMD_SIZE], _compute: EVMCallComputeV1
-) -> Bytes[constants.MAX_CMD_SIZE]:
+    _cmd: Bytes[MAX_CMD_SIZE], _compute: EVMCallComputeV1
+) -> Bytes[MAX_CMD_SIZE]:
     """
     @notice Appends an EVM call compute to the command
     @param _cmd The existing command bytes
@@ -156,10 +151,10 @@ def appendEVMCallComputeV1(
     @return The updated command bytes
     """
 
-    assert len(_cmd) + 39 <= constants.MAX_CMD_SIZE, "OApp: Command too large"
+    assert len(_cmd) + 39 <= MAX_CMD_SIZE, "OApp: Command too large"
     # dev: 39 is length of all fields excluding existing command
     return concat(
-        abi_decode(abi_encode(_cmd), (Bytes[constants.MAX_CMD_SIZE - 39])),
+        abi_decode(abi_encode(_cmd), (Bytes[MAX_CMD_SIZE - 39])),
         convert(COMPUTE_VERSION, bytes1),
         convert(COMPUTE_TYPE_SINGLE_VIEW_EVM_CALL, bytes2),
         convert(_compute.computeSetting, bytes1),

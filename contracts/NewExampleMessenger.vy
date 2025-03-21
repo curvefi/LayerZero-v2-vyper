@@ -98,21 +98,21 @@ def withdraw_eth(_amount: uint256):
 # #                    MESSAGING FUNCTIONS                       #
 # ################################################################
 
-@view
-@external
-def quote_message_fee(
-    _dst_eid: uint32,
-    _receiver: address,
-    _message: String[128],
-    _gas_limit: uint256 = 0,
-    _value: uint256 = 0,
-) -> uint256:
-    """
-    @notice Quote fee for sending message
-    """
+# @view
+# @external
+# def quote_message_fee(
+#     _dst_eid: uint32,
+#     _receiver: address,
+#     _message: String[128],
+#     _gas_limit: uint256 = 0,
+#     _value: uint256 = 0,
+# ) -> uint256:
+#     """
+#     @notice Quote fee for sending message
+#     """
 
-    encoded: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = convert(_message, Bytes[lz.LZ_MESSAGE_SIZE_CAP])
-    return lz._quote_lz_fee(_dst_eid, _receiver, encoded, _gas_limit, _value)
+#     encoded: Bytes[OApp.MAX_MESSAGE_SIZE] = convert(_message, Bytes[OApp.MAX_MESSAGE_SIZE])
+#     return OApp._quote_lz_fee(_dst_eid, _receiver, encoded, _gas_limit, _value)
 
 
 # @payable

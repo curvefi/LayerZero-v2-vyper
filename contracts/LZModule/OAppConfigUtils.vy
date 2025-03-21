@@ -29,6 +29,7 @@ Includes vectorized (batch) configuration functions.
 
 # Import ownership management. Defer initialization to main contract.
 from snekmate.auth import ownable
+
 uses: ownable
 
 # Vyper-specific constants
@@ -49,7 +50,6 @@ interface ILayerZeroEndpointV2:
     def skip(_oapp: address, _srcEid: uint32, _sender: bytes32, _nonce: uint64): nonpayable
 
 
-
 ################################################################
 #                           CONSTANTS                          #
 ################################################################
@@ -62,8 +62,6 @@ MAX_CONFIG_ITEMS: constant(uint256) = constants.MAX_CONFIG_ITEMS
 CONFIG_TYPE_ULN: constant(uint32) = 0
 CONFIG_TYPE_EXECUTOR: constant(uint32) = 1
 CONFIG_TYPE_READ: constant(uint32) = 2
-
-READ_CHANNEL_THRESHOLD: constant(uint32) = 4294965694  # EIDs > this are read channels
 
 
 ################################################################
@@ -81,7 +79,7 @@ ENDPOINT: public(immutable(ILayerZeroEndpointV2))
 struct SetConfigParam:
     eid: uint32
     configType: uint32
-    config: Bytes[9*32 + 2*MAX_DVNS*32] # 9 words for ULNConfig, 2*MAX_DVNS words for DVNs
+    config: Bytes[9 * 32 + 2 * MAX_DVNS * 32]  # 9 words for ULNConfig, 2*MAX_DVNS words for DVNs
 
 
 struct Timeout:
@@ -161,7 +159,9 @@ def setReceiveLibraries(
     """
     ownable._check_owner()
 
-    assert len(_eids) == len(_newLibs) and len(_eids) == len(_gracePeriods), "OAppConfig: Array length mismatch"
+    assert len(_eids) == len(_newLibs) and len(_eids) == len(
+        _gracePeriods
+    ), "OAppConfig: Array length mismatch"
 
     for i: uint256 in range(len(_eids), bound=MAX_CONFIG_ITEMS):
         extcall ENDPOINT.setReceiveLibrary(self, _eids[i], _newLibs[i], _gracePeriods[i])
@@ -195,7 +195,9 @@ def setUlnConfigs(
     items_count: uint256 = len(_eids)
     assert len(_libs) == items_count, "OAppConfig: Array length mismatch: libs"
     assert len(_confirmations) == items_count, "OAppConfig: Array length mismatch: confirmations"
-    assert len(_optional_dvn_thresholds) == items_count, "OAppConfig: Array length mismatch: thresholds"
+    assert (
+        len(_optional_dvn_thresholds) == items_count
+    ), "OAppConfig: Array length mismatch: thresholds"
     assert len(_required_dvns) == items_count, "OAppConfig: Array length mismatch: required DVNs"
     assert len(_optional_dvns) == items_count, "OAppConfig: Array length mismatch: optional DVNs"
 
@@ -234,14 +236,13 @@ def setUlnConfigs(
             if i > 0 and len(config_params) > 0:
                 extcall ENDPOINT.setConfig(self, current_lib, config_params)
 
-
-            # Start a new batch
             current_lib = _libs[i]
             config_params = [config_param]
         else:
             # Add to current batch
             config_params.append(config_param)
-    # Send the final batch if any params are left
+        # Send the final batch if any params are left
+
     if len(config_params) > 0:
         extcall ENDPOINT.setConfig(self, current_lib, config_params)
 
@@ -258,7 +259,7 @@ def setUlnReadConfigs(
     """
     @notice Set multiple ULN Read configurations in a single transaction
     @param _libs Array of library addresses
-    @param _eids Array of endpoint IDs (must be > READ_CHANNEL_THRESHOLD)
+    @param _eids Array of endpoint IDs
     @param _executors Array of executor addresses
     @param _optional_dvn_thresholds Array of optional DVN thresholds
     @param _required_dvns Nested array of required DVN addresses for each config
@@ -270,7 +271,9 @@ def setUlnReadConfigs(
     items_count: uint256 = len(_eids)
     assert len(_libs) == items_count, "OAppConfig: Array length mismatch: libs"
     assert len(_executors) == items_count, "OAppConfig: Array length mismatch: executors"
-    assert len(_optional_dvn_thresholds) == items_count, "OAppConfig: Array length mismatch: thresholds"
+    assert (
+        len(_optional_dvn_thresholds) == items_count
+    ), "OAppConfig: Array length mismatch: thresholds"
     assert len(_required_dvns) == items_count, "OAppConfig: Array length mismatch: required DVNs"
     assert len(_optional_dvns) == items_count, "OAppConfig: Array length mismatch: optional DVNs"
 
@@ -281,8 +284,6 @@ def setUlnReadConfigs(
     current_lib: address = empty(address)
     config_params: DynArray[SetConfigParam, MAX_CONFIG_ITEMS] = []
     for i: uint256 in range(items_count, bound=MAX_CONFIG_ITEMS):
-        # Ensure EID is for a read channel
-        assert _eids[i] > READ_CHANNEL_THRESHOLD, "OAppConfig: Not a read channel EID"
 
         # Get DVN counts directly from array lengths
         required_count: uint8 = convert(len(_required_dvns[i]), uint8)
@@ -312,14 +313,13 @@ def setUlnReadConfigs(
             if i > 0 and len(config_params) > 0:
                 extcall ENDPOINT.setConfig(self, current_lib, config_params)
 
-
-            # Start a new batch
             current_lib = _libs[i]
             config_params = [config_param]
         else:
             # Add to current batch
             config_params.append(config_param)
-    # Send the final batch if any params are left
+        # Send the final batch if any params are left
+
     if len(config_params) > 0:
         extcall ENDPOINT.setConfig(self, current_lib, config_params)
 
@@ -366,14 +366,13 @@ def setExecutorConfigs(
             if i > 0 and len(config_params) > 0:
                 extcall ENDPOINT.setConfig(self, current_lib, config_params)
 
-
-            # Start a new batch
             current_lib = _libs[i]
             config_params = [config_param]
         else:
             # Add to current batch
             config_params.append(config_param)
-    # Send the final batch if any params are left
+        # Send the final batch if any params are left
+
     if len(config_params) > 0:
         extcall ENDPOINT.setConfig(self, current_lib, config_params)
 

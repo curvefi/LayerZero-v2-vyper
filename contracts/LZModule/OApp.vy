@@ -31,6 +31,7 @@ To use lzRead functionality, you must use ReadCmdCodecV1.vy to encode read reque
 
 # Import ownership management. Defer initialization to main contract.
 from snekmate.auth import ownable
+
 uses: ownable
 
 # Vyper-specific constants
@@ -50,7 +51,6 @@ interface ILayerZeroEndpointV2:
     def setDelegate(_delegate: address): nonpayable
     def eid() -> uint32: view
     def lzToken() -> address: view
-    def skip(_oapp: address, _srcEid: uint32, _sender: bytes32, _nonce: uint64): nonpayable
 
 
 ################################################################
@@ -119,6 +119,7 @@ struct SetConfigParam:
     eid: uint32
     configType: uint32
     config: Bytes[1024]
+
 
 ################################################################
 #                         CONSTRUCTOR                          #
