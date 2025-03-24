@@ -29,7 +29,7 @@ To use lzRead functionality, you must use ReadCmdCodecV1.vy to encode read reque
 #                            MODULES                           #
 ################################################################
 
-# Import ownership management. Must be initialized in main contract.
+# Ownership management. Must be initialized in main contract.
 from snekmate.auth import ownable
 uses: ownable
 
@@ -40,7 +40,7 @@ from . import VyperConstants as constants
 #                         INTERFACES                           #
 ################################################################
 
-# Import ERC20 interface for lzToken fee payment
+# ERC20 interface is needed for lzToken fee payment
 from ethereum.ercs import IERC20
 
 # LayerZero EndpointV2 interface
@@ -73,14 +73,15 @@ MAX_EXTRA_DATA_SIZE: constant(uint256) = constants.MAX_EXTRA_DATA_SIZE
 # Offspec constant, useful for read messages detection
 READ_CHANNEL_THRESHOLD: constant(uint32) = 4294965694  # max(uint32)-1601, 1600 channels reserved for read
 
-# Core contract state (immutable)
-ENDPOINT: public(immutable(ILayerZeroEndpointV2))
 
 ################################################################
 #                           STORAGE                            #
 ################################################################
 
-# Remote peers by EID
+# The LayerZero endpoint associated with the given OApp
+endpoint: public(immutable(ILayerZeroEndpointV2))
+
+# Mapping to store peers associated with corresponding endpoints
 peers: public(HashMap[uint32, bytes32])
 
 ################################################################
@@ -93,7 +94,6 @@ struct MessagingParams:
     message: Bytes[MAX_MESSAGE_SIZE]
     options: Bytes[MAX_OPTIONS_TOTAL_SIZE]
     payInLzToken: bool
-
 
 struct MessagingReceipt:
     guid: bytes32
@@ -111,13 +111,6 @@ struct Origin:
     sender: bytes32
     nonce: uint64
 
-
-struct SetConfigParam:
-    eid: uint32
-    configType: uint32
-    config: Bytes[1024]
-
-
 ################################################################
 #                         CONSTRUCTOR                          #
 ################################################################
@@ -133,10 +126,10 @@ def __init__(_endpoint: address, _delegate: address):
     assert _delegate != empty(address), "Invalid delegate"
 
     # Set up endpoint
-    ENDPOINT = ILayerZeroEndpointV2(_endpoint)
+    endpoint = ILayerZeroEndpointV2(_endpoint)
 
     # Set delegate for endpoint config
-    extcall ENDPOINT.setDelegate(_delegate)
+    extcall endpoint.setDelegate(_delegate)
 
 
 ################################################################
@@ -196,7 +189,7 @@ def setDelegate(_delegate: address):
     """
     ownable._check_owner()
 
-    extcall ENDPOINT.setDelegate(_delegate)
+    extcall endpoint.setDelegate(_delegate)
 
 
 ################################################################
@@ -224,6 +217,7 @@ def setReadChannel(_channelId: uint32, _active: bool):
 # oAppVersion - not implemented
 
 @external
+@view
 def isComposeMsgSender(
     _origin: Origin, _message: Bytes[MAX_MESSAGE_SIZE], _sender: address
 ) -> bool:
@@ -237,8 +231,8 @@ def isComposeMsgSender(
     return _sender == self
 
 
-@view
 @external
+@view
 def allowInitializePath(_origin: Origin) -> bool:
     """
     @notice Checks if the path initialization is allowed based on the provided origin.
@@ -250,8 +244,8 @@ def allowInitializePath(_origin: Origin) -> bool:
     return self.peers[_origin.srcEid] == _origin.sender
 
 
-@view
 @external
+@pure
 def nextNonce(_srcEid: uint32, _sender: bytes32) -> uint64:
     """
     @dev Vyper-specific: If your app relies on ordered execution, you must change this function.
@@ -269,7 +263,8 @@ def nextNonce(_srcEid: uint32, _sender: bytes32) -> uint64:
 
 
 @internal
-def lzReceive(
+@view
+def _lzReceive(
     _origin: Origin,
     _guid: bytes32,
     _message: Bytes[MAX_MESSAGE_SIZE],
@@ -278,6 +273,7 @@ def lzReceive(
 ):
     """
     @dev Vyper-specific: This must be called first in external lzReceive implementation.
+    Name changed to _lzReceive due to internal nature of the function.
 
     @notice Entry point for receiving messages or packets from the endpoint.
     @param _origin The origin information containing the source endpoint and sender address.
@@ -290,7 +286,7 @@ def lzReceive(
     @param _extraData Additional arbitrary data provided by the corresponding executor.
     """
     # Verify that the sender is the endpoint
-    assert msg.sender == ENDPOINT.address, "OApp: only endpoint"
+    assert msg.sender == endpoint.address, "OApp: only endpoint"
 
     # Verify that the message comes from a trusted peer
     assert self._getPeerOrRevert(_origin.srcEid) == _origin.sender, "OApp: invalid sender"
@@ -303,8 +299,8 @@ def lzReceive(
 # Vyper-specific:
 # oAppVersion - not implemented
 
-@view
 @internal
+@view
 def _quote(
     _dstEid: uint32,
     _message: Bytes[MAX_MESSAGE_SIZE],
@@ -322,7 +318,7 @@ def _quote(
             - lzTokenFee: The LZ token fee for the message.
     """
 
-    return staticcall ENDPOINT.quote(
+    return staticcall endpoint.quote(
         MessagingParams(
             dstEid=_dstEid,
             receiver=self._getPeerOrRevert(_dstEid),
@@ -334,8 +330,8 @@ def _quote(
     )
 
 
-@payable
 @internal
+@payable
 def _lzSend(
     _dstEid: uint32,
     _message: Bytes[MAX_MESSAGE_SIZE],
@@ -346,7 +342,7 @@ def _lzSend(
     """
     @dev Vyper-specific: fees are treated differently than in Solidity OApp.
         - _payNative and _payLzToken are inlined.
-        - Multiple sends are supported within single transaction (msg.value >= native_fee) instead of '!='.
+        - Multiple sends are supported within single transaction (msg.value >= native_fee) instead of '=='.
 
     @dev Internal function to interact with the LayerZero EndpointV2.send() for sending a message.
     @param _dstEid The destination endpoint ID.
@@ -371,11 +367,12 @@ def _lzSend(
 
     lzToken_fee: uint256 = _fee.lzTokenFee
     if lzToken_fee > 0:
-        lzToken: address = staticcall ENDPOINT.lzToken()
+        # Pay LZ token fee by sending tokens to the endpoint.
+        lzToken: address = staticcall endpoint.lzToken()
         assert lzToken != empty(address), "OApp: LZ token unavailable"
-        extcall IERC20(lzToken).transferFrom(msg.sender, ENDPOINT.address, lzToken_fee)
+        extcall IERC20(lzToken).transferFrom(msg.sender, endpoint.address, lzToken_fee)
 
-    return extcall ENDPOINT.send(
+    return extcall endpoint.send(
         MessagingParams(
             dstEid=_dstEid,
             receiver=peer,

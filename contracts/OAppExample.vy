@@ -30,7 +30,7 @@ exports: (
 )
 
 # LayerZero module
-from LZModule import OApp
+from oapp_vyper import OApp
 initializes: OApp[ownable:=ownable]
 exports: (
     OApp.setPeer,
@@ -40,11 +40,9 @@ exports: (
     OApp.allowInitializePath,
     OApp.nextNonce
 )
-from LZModule import OAppConfigUtils
-initializes: OAppConfigUtils[ownable:=ownable]
 
-from LZModule import OptionsBuilder
-from LZModule import ReadCmdCodecV1
+from oapp_vyper import OptionsBuilder
+from oapp_vyper import ReadCmdCodecV1
 
 ################################################################
 #                            EVENTS                            #
@@ -86,7 +84,6 @@ def __init__(_endpoint: address):
     ownable._transfer_ownership(tx.origin)
 
     OApp.__init__(_endpoint, tx.origin)
-    OAppConfigUtils.__init__(_endpoint)
 
 
 @external
@@ -238,11 +235,11 @@ def request_read(
     # B: encode request
     encoded_message: Bytes[ReadCmdCodecV1.MAX_CMD_SIZE] = ReadCmdCodecV1.encode(0, [request])
 
-    # C: create options using OptionsBuilder module
+    # step 2: create options using OptionsBuilder module
     options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
     options = OptionsBuilder.addExecutorLzReadOption(options, _gas_limit, _expected_response_size, _value)
 
-    # D: send message
+    # step 3: send message
     fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=msg.value, lzTokenFee=_lz_token_fee)
     OApp._lzSend(
         _dst_eid,
@@ -254,59 +251,37 @@ def request_read(
 
     log ReadRequestSent(destination=_dst_eid, target=_target, payload=encoded_message)
 
-#     # Prepare read message
-#     message: Bytes[lz.LZ_MESSAGE_SIZE_CAP] = lz._prepare_read_message_bytes(
-#         _dst_eid, _target, _calldata, False, convert(block.timestamp, uint64), 1
-#     )
 
-#     # Send to read channel
-#     lz._send_message(
-#         lz.LZ_READ_CHANNEL,  # _dstEid
-#         convert(self, bytes32),  # _receiver
-#         message,  # _message
-#         _gas_limit,  # _gas_limit: Use default gas limit
-#         _value,  # _lz_receive_value: Will be available in lzReceive (and pay for broadcasts)
-#         _data_size,  # _data_size: Expected read size (uint256: block number, bytes32: block hash)
-#         msg.value,  # _request_msg_value: Use cached fee as send message value
-#         msg.sender,  # _refund_address: Refund unspent fees to read requestor
-#         _check_fee,  # _perform_fee_check: No fee check
-#     )
+@external
+@payable
+def lzReceive(
+    _origin: OApp.Origin,
+    _guid: bytes32,
+    _message: Bytes[OApp.MAX_MESSAGE_SIZE],
+    _executor: address,
+    _extraData: Bytes[OApp.MAX_EXTRA_DATA_SIZE],
+):
+    """
+    @notice Handle both regular messages and read responses
+    """
 
-#     log ReadRequestSent(_dst_eid, _target, _calldata)
+    # Basic parameter validation for message source
+    OApp._lzReceive(_origin, _guid, _message, _executor, _extraData)
 
-
-# @payable
-# @external
-# def lzReceive(
-#     _origin: lz.Origin,
-#     _guid: bytes32,
-#     _message: Bytes[lz.LZ_MESSAGE_SIZE_CAP],
-#     _executor: address,
-#     _extraData: Bytes[64],
-# ) -> bool:
-#     """
-#     @notice Handle both regular messages and read responses
-#     """
-
-#     # Verify message source
-#     assert lz._lz_receive(_origin, _guid, _message, _executor, _extraData)
-
-#     if lz._is_read_response(_origin):
-#         # Handle read response
-#         message: String[128] = convert(_message, String[128])
-#         log ReadResponseReceived(_origin.srcEid, message)
-#     else:
-#         # Handle regular message
-#         message: String[128] = convert(_message, String[128])
-#         log MessageReceived(_origin.srcEid, message)
-
-#     return True
+    if _origin.srcEid > OApp.READ_CHANNEL_THRESHOLD:
+        # Handle read response
+        message: String[OApp.MAX_MESSAGE_SIZE] = convert(_message, String[OApp.MAX_MESSAGE_SIZE])
+        log ReadResponseReceived(source=_origin.srcEid, response=message)
+    else:
+        # Handle regular message
+        message: String[OApp.MAX_MESSAGE_SIZE] = convert(_message, String[OApp.MAX_MESSAGE_SIZE])
+        log MessageReceived(source=_origin.srcEid, payload=message)
 
 
-# @view
-# @external
-# def dummy_endpoint(_input: uint256) -> uint256:
-#     return 2 * _input
+@view
+@external
+def dummy_endpoint(_input: uint256) -> uint256:
+    return 2 * _input
 
 
 @external

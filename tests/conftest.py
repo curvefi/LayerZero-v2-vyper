@@ -2,13 +2,24 @@ import boa
 import pytest
 import os
 from web3 import Web3
+from eth_utils import to_bytes
 
 LZ_ENDPOINT_BASE_SEPOLIA = "0x6EDCE65403992e310A62460808c4b910D972f10f"
 LZ_CHAIN_ID = 84532
 LZ_ENDPOINT_ID = 40245
-LZ_READ_CHANNEL = 4294967294
+LZ_READ_CHANNEL = 4294967295
 
 BOA_CACHE = True
+
+
+def _to_bytes32(value):
+    """Convert a string or address to bytes32 format."""
+    if isinstance(value, str) and value.startswith("0x"):
+        # Convert hex string to bytes and pad to 32 bytes
+        return to_bytes(hexstr=value).rjust(32, b"\x00")
+    else:
+        # For non-hex strings or other types
+        return to_bytes(text=str(value)).rjust(32, b"\x00")
 
 
 @pytest.fixture(autouse=True)
@@ -90,14 +101,46 @@ def scan_url():
 
 
 @pytest.fixture()
-def lz_module_contract(dev_deployer):
+def oapp_module_contract(dev_deployer):
     with boa.env.prank(dev_deployer):
-        lz = boa.load("contracts/LayerZeroV2.vy")
-        lz.eval(f"self._initialize({LZ_ENDPOINT_BASE_SEPOLIA}, 500_000, {LZ_READ_CHANNEL}, [], [])")
-        return lz
+        wrapper_contract = """
+        from snekmate.auth import ownable
+        from contracts.oapp_vyper import OApp
+
+        initializes: ownable
+        initializes: OApp[ownable:=ownable]
+
+        exports: ownable.__interface__
+        exports: OApp.__interface__
+
+        @deploy
+        def __init__(_endpoint: address):
+            ownable.__init__()
+            ownable._transfer_ownership(tx.origin)
+
+            OApp.__init__(_endpoint, tx.origin)
+
+        @internal #placeholders for bytecode inclusion
+        def placeholders():
+            OApp._getPeerOrRevert(0)
+            OApp._lzReceive(empty(OApp.Origin), empty(bytes32), empty(Bytes[OApp.MAX_MESSAGE_SIZE]), empty(address), empty(Bytes[OApp.MAX_EXTRA_DATA_SIZE]))
+        """
+        contract = boa.loads(wrapper_contract, LZ_ENDPOINT_BASE_SEPOLIA)
+
+        return contract
 
 
 @pytest.fixture()
 def messenger_contract(dev_deployer):
     with boa.env.prank(dev_deployer):
-        return boa.load("contracts/ExampleMessenger.vy", LZ_ENDPOINT_BASE_SEPOLIA, 500_000)
+        return boa.load("contracts/OAppExample.vy", LZ_ENDPOINT_BASE_SEPOLIA)
+
+
+@pytest.fixture()
+def options_builder_contract():
+    return boa.load("contracts/oapp_vyper/OptionsBuilder.vy")
+
+
+@pytest.fixture()
+def read_cmd_codec_contract():
+    return boa.load("contracts/oapp_vyper/ReadCmdCodecV1.vy")

@@ -5,7 +5,7 @@
 
 @notice Vyper implementation of the MessageLibManager functionality from LayerZero.
 This module provides functions to set message libraries (send/receive) and other configurations
-for OApps. This is meant to be called by either the OApp itself or its delegate.
+for OApps. This is meant to be called by the OApp owner.
 
 @dev The functions in this module allow configuration of:
 - Send libraries
@@ -13,8 +13,6 @@ for OApps. This is meant to be called by either the OApp itself or its delegate.
 - DVN (ULN) configurations
 - ULN Read configurations
 - Executor configurations
-
-Includes vectorized (batch) configuration functions.
 
 @license Copyright (c) Curve.Fi, 2025 - all rights reserved
 

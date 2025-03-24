@@ -76,21 +76,17 @@ struct EVMCallComputeV1:
 @internal
 @pure
 def _decodeCmdAppLabel(_cmd: Bytes[MAX_CMD_SIZE]) -> uint16:
-    offset: uint256 = 0
-    cmdVersion: uint16 = abi_decode(abi_encode(slice(_cmd, offset, offset + 2)), uint16)
-    offset += 2
+    cmdVersion: uint16 = convert(slice(_cmd, 0, 2), uint16)
     assert cmdVersion == CMD_VERSION, "OApp: InvalidVersion"
-    return abi_decode(abi_encode(slice(_cmd, offset, offset + 2)), uint16)
+    return convert(slice(_cmd, 2, 2), uint16)
 
 
 @internal
 @pure
 def _decodeRequestV1AppRequestLabel(_request: Bytes[MAX_CMD_SIZE]) -> uint16:
-    offset: uint256 = 0
-    requestVersion: uint8 = abi_decode(abi_encode(slice(_request, offset, offset + 1)), uint8)
-    offset += 1
+    requestVersion: uint8 = convert(slice(_request, 0, 1), uint8)
     assert requestVersion == REQUEST_VERSION, "OApp: InvalidVersion"
-    return abi_decode(abi_encode(slice(_request, offset, offset + 2)), uint16)
+    return convert(slice(_request, 1, 2), uint16)
 
 
 @internal
