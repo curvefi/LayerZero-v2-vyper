@@ -31,14 +31,15 @@ exports: (
 
 # LayerZero module
 from oapp_vyper import OApp
-initializes: OApp[ownable:=ownable]
+
+initializes: OApp[ownable := ownable]
 exports: (
     OApp.setPeer,
     OApp.setDelegate,
     OApp.setReadChannel,
     OApp.isComposeMsgSender,
     OApp.allowInitializePath,
-    OApp.nextNonce
+    OApp.nextNonce,
 )
 
 from oapp_vyper import OptionsBuilder
@@ -123,6 +124,7 @@ def quote_message_fee(
     # step 3: quote fee
     return OApp._quote(_dst_eid, encoded_message, options, _pay_in_lz_token)
 
+
 @payable
 @external
 def send_message(
@@ -150,13 +152,7 @@ def send_message(
 
     # # step 3: send message
     fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=msg.value, lzTokenFee=_lz_token_fee)
-    OApp._lzSend(
-        _dst_eid,
-        encoded_message,
-        options,
-        fees,
-        msg.sender
-    )
+    OApp._lzSend(_dst_eid, encoded_message, options, fees, msg.sender)
 
     log MessageSent(destination=_dst_eid, payload=_message, fees=fees)
 
@@ -185,14 +181,16 @@ def quote_read_fee(
         blockNumOrTimestamp=convert(block.timestamp, uint64),
         confirmations=0,
         to=_target,
-        callData=_calldata
+        callData=_calldata,
     )
     # B: encode request
     encoded_message: Bytes[ReadCmdCodecV1.MAX_CMD_SIZE] = ReadCmdCodecV1.encode(0, [request])
 
     # step 2: create options using OptionsBuilder module
     options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
-    options = OptionsBuilder.addExecutorLzReadOption(options, _gas_limit, _expected_response_size, _value)
+    options = OptionsBuilder.addExecutorLzReadOption(
+        options, _gas_limit, _expected_response_size, _value
+    )
 
     # step 3: quote fee
     return OApp._quote(_dst_eid, encoded_message, options, _pay_in_lz_token)
@@ -229,7 +227,7 @@ def request_read(
         blockNumOrTimestamp=convert(block.timestamp, uint64),
         confirmations=0,
         to=_target,
-        callData=_calldata
+        callData=_calldata,
     )
 
     # B: encode request
@@ -237,17 +235,13 @@ def request_read(
 
     # step 2: create options using OptionsBuilder module
     options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
-    options = OptionsBuilder.addExecutorLzReadOption(options, _gas_limit, _expected_response_size, _value)
+    options = OptionsBuilder.addExecutorLzReadOption(
+        options, _gas_limit, _expected_response_size, _value
+    )
 
     # step 3: send message
     fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=msg.value, lzTokenFee=_lz_token_fee)
-    OApp._lzSend(
-        _dst_eid,
-        encoded_message,
-        options,
-        fees,
-        msg.sender
-    )
+    OApp._lzSend(_dst_eid, encoded_message, options, fees, msg.sender)
 
     log ReadRequestSent(destination=_dst_eid, target=_target, payload=encoded_message)
 

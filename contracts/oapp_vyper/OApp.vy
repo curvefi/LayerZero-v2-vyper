@@ -31,6 +31,7 @@ To use lzRead functionality, you must use ReadCmdCodecV1.vy to encode read reque
 
 # Ownership management. Must be initialized in main contract.
 from snekmate.auth import ownable
+
 uses: ownable
 
 # Vyper-specific constants
@@ -71,7 +72,9 @@ MAX_OPTIONS_TOTAL_SIZE: constant(uint256) = constants.MAX_OPTIONS_TOTAL_SIZE
 MAX_EXTRA_DATA_SIZE: constant(uint256) = constants.MAX_EXTRA_DATA_SIZE
 
 # Offspec constant, useful for read messages detection
-READ_CHANNEL_THRESHOLD: constant(uint32) = 4294965694  # max(uint32)-1601, 1600 channels reserved for read
+READ_CHANNEL_THRESHOLD: constant(
+    uint32
+) = 4294965694  # max(uint32)-1601, 1600 channels reserved for read
 
 
 ################################################################
@@ -95,6 +98,7 @@ struct MessagingParams:
     options: Bytes[MAX_OPTIONS_TOTAL_SIZE]
     payInLzToken: bool
 
+
 struct MessagingReceipt:
     guid: bytes32
     nonce: uint64
@@ -110,6 +114,7 @@ struct Origin:
     srcEid: uint32
     sender: bytes32
     nonce: uint64
+
 
 ################################################################
 #                         CONSTRUCTOR                          #
