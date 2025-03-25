@@ -1,7 +1,7 @@
-"""Test OAppSender functionality for OApp."""
+"""Test OAppSender functionality for OApp. This actually tests the OAppExample contract (to simplify options building)"""
 
 import boa
-from conftest import _to_bytes32, LZ_ENDPOINT_ID
+from conftest import _to_bytes32, LZ_ENDPOINT_ID, LZ_READ_CHANNEL
 
 
 def test_quote_message_fee(messenger_contract, dev_deployer):
@@ -121,3 +121,60 @@ def test_send_message_no_peer(messenger_contract, dev_deployer):
                 0,  # lz_token_fee
                 value=1000,  # Some ETH value
             )
+
+
+def test_quote_read_fee(messenger_contract, dev_deployer):
+    """Test the quote_read_fee method that uses OApp._quote internally."""
+
+    # Activate the read channel as owner
+    with boa.env.prank(dev_deployer):
+        messenger_contract.setReadChannel(LZ_READ_CHANNEL, True)
+
+    test_eid = LZ_ENDPOINT_ID
+    test_receiver = messenger_contract.address
+    test_calldata = b"Test message"
+    test_gas_limit = 500_000
+
+    # Get quote for message
+    fee = messenger_contract.quote_read_fee(
+        LZ_READ_CHANNEL, test_eid, test_receiver, test_calldata, test_gas_limit
+    )
+    print(fee)
+    # Validate fee structure (may be zero in test environment)
+    assert isinstance(fee.nativeFee, int), "nativeFee should be an integer"
+    assert isinstance(fee.lzTokenFee, int), "lzTokenFee should be an integer"
+
+
+def test_send_read_request(messenger_contract, dev_deployer):
+    """Test the send_read_request method that uses OApp._lzSend internally."""
+    # Activate the read channel as owner
+    with boa.env.prank(dev_deployer):
+        messenger_contract.setReadChannel(LZ_READ_CHANNEL, True)
+
+    test_eid = LZ_ENDPOINT_ID
+    test_receiver = messenger_contract.address
+    test_calldata = b"Test message"
+    test_gas_limit = 500_000
+
+    # Get quote for message
+    fee = messenger_contract.quote_read_fee(
+        LZ_READ_CHANNEL, test_eid, test_receiver, test_calldata, test_gas_limit
+    )
+    print(fee)
+    # Validate fee structure (may be zero in test environment)
+    assert isinstance(fee.nativeFee, int), "nativeFee should be an integer"
+    assert isinstance(fee.lzTokenFee, int), "lzTokenFee should be an integer"
+
+    # Add ETH to the environment
+    boa.env.set_balance(dev_deployer, 10**18)  # 1 ETH
+
+    # Send message with quoted fee (may not actually send in test environment)
+    with boa.env.prank(dev_deployer):
+        messenger_contract.request_read(
+            LZ_READ_CHANNEL,
+            test_eid,
+            test_receiver,
+            test_calldata,
+            test_gas_limit,
+            value=fee.nativeFee * 2,
+        )

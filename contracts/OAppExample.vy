@@ -160,6 +160,7 @@ def send_message(
 @view
 @external
 def quote_read_fee(
+    _read_channel_id: uint32,
     _dst_eid: uint32,
     _target: address,
     _calldata: Bytes[ReadCmdCodecV1.MAX_CALLDATA_SIZE],
@@ -193,12 +194,13 @@ def quote_read_fee(
     )
 
     # step 3: quote fee
-    return OApp._quote(_dst_eid, encoded_message, options, _pay_in_lz_token)
+    return OApp._quote(_read_channel_id, encoded_message, options, _pay_in_lz_token)
 
 
 @payable
 @external
 def request_read(
+    _read_channel_id: uint32,
     _dst_eid: uint32,
     _target: address,
     _calldata: Bytes[ReadCmdCodecV1.MAX_CALLDATA_SIZE],
@@ -241,9 +243,9 @@ def request_read(
 
     # step 3: send message
     fees: OApp.MessagingFee = OApp.MessagingFee(nativeFee=msg.value, lzTokenFee=_lz_token_fee)
-    OApp._lzSend(_dst_eid, encoded_message, options, fees, msg.sender)
+    OApp._lzSend(_read_channel_id, encoded_message, options, fees, msg.sender)
 
-    log ReadRequestSent(destination=_dst_eid, target=_target, payload=encoded_message)
+    log ReadRequestSent(destination=_read_channel_id, target=_target, payload=encoded_message)
 
 
 @external
