@@ -72,6 +72,7 @@ struct ULNExecutorConfig:
 ################################################################
 
 @external
+@pure
 def prepareUlnConfig(
     _lib: address,
     _eid: uint32,
@@ -117,6 +118,7 @@ def prepareUlnConfig(
     return config_param
 
 @external
+@pure
 def prepareUlnReadConfig(
     _eid: uint32,
     _executor: address,
@@ -159,6 +161,7 @@ def prepareUlnReadConfig(
 
 
 @external
+@pure
 def prepareExecutorConfig(
     _lib: address,
     _eid: uint32,

@@ -188,7 +188,7 @@ def addExecutorLzReadOption(
     @param _options The existing options container.
     @param _gas The gasLimit for the lzRead() function call.
     @param _size The size of the lzRead() function call.
-    @param _value The msg.value for the lzRead() function call.
+    @param _value The msg.value for the lzRead return function call.
     @return options The updated options container.
     """
     option: Bytes[MAX_OPTION_SINGLE_SIZE] = b""
@@ -200,7 +200,7 @@ def addExecutorLzReadOption(
         value_bytes: bytes16 = convert(_value, bytes16)
         option = concat(gas_bytes, size_bytes, value_bytes)
     else:
-        option = concat(convert(_gas, bytes16), convert(_size, bytes4))
+        option = concat(gas_bytes, size_bytes)
 
     return self.addExecutorOption(_options, OPTION_TYPE_LZREAD, option)
 

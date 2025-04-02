@@ -62,3 +62,4 @@ tmp.json
 .coverage
 coverage.xml
 htmlcov/
+.cursorrules

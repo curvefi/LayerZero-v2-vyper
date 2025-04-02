@@ -34,6 +34,8 @@ from oapp_vyper import OApp
 
 initializes: OApp[ownable := ownable]
 exports: (
+    OApp.endpoint,
+    OApp.peers,
     OApp.setPeer,
     OApp.setDelegate,
     OApp.setReadChannel,
@@ -63,7 +65,7 @@ event MessageReceived:
 event ReadRequestSent:
     destination: uint32
     target: address
-    payload: Bytes[ReadCmdCodecV1.MAX_CMD_SIZE]
+    payload: Bytes[ReadCmdCodecV1.MAX_MESSAGE_SIZE]
 
 
 event ReadResponseReceived:
@@ -185,7 +187,7 @@ def quote_read_fee(
         callData=_calldata,
     )
     # B: encode request
-    encoded_message: Bytes[ReadCmdCodecV1.MAX_CMD_SIZE] = ReadCmdCodecV1.encode(0, [request])
+    encoded_message: Bytes[ReadCmdCodecV1.MAX_MESSAGE_SIZE] = ReadCmdCodecV1.encode(0, [request])
 
     # step 2: create options using OptionsBuilder module
     options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()
@@ -233,7 +235,7 @@ def request_read(
     )
 
     # B: encode request
-    encoded_message: Bytes[ReadCmdCodecV1.MAX_CMD_SIZE] = ReadCmdCodecV1.encode(0, [request])
+    encoded_message: Bytes[ReadCmdCodecV1.MAX_MESSAGE_SIZE] = ReadCmdCodecV1.encode(0, [request])
 
     # step 2: create options using OptionsBuilder module
     options: Bytes[OptionsBuilder.MAX_OPTIONS_TOTAL_SIZE] = OptionsBuilder.newOptions()

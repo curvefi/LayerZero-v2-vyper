@@ -18,13 +18,13 @@ from . import VyperConstants as constants
 ################################################################
 
 # Vyper Byte size limits
+MAX_MESSAGE_SIZE: constant(uint256) = constants.MAX_MESSAGE_SIZE
 MAX_CALLDATA_SIZE: constant(uint256) = constants.MAX_CALLDATA_SIZE
-MAX_EVM_CALL_REQUESTS: constant(uint256) = constants.MAX_EVM_CALL_REQUESTS
 
-MAX_CMD_SIZE: constant(uint256) = MAX_EVM_CALL_REQUESTS * (MAX_CALLDATA_SIZE + 42) + 6 + 39
-# 42 is per-call header length, see appendEVMCallRequestV1,
+MAX_EVM_CALL_REQUESTS: constant(uint256) = (MAX_MESSAGE_SIZE - 6 - 39) // (MAX_CALLDATA_SIZE + 42)
 # +6 is general header, see encode()
 # +39 is single compute command length, see appendEVMCallComputeV1
+# +42 is per-call header length, see appendEVMCallRequestV1
 
 # Read codec constants
 CMD_VERSION: constant(uint16) = 1
@@ -75,7 +75,7 @@ struct EVMCallComputeV1:
 
 @internal
 @pure
-def _decodeCmdAppLabel(_cmd: Bytes[MAX_CMD_SIZE]) -> uint16:
+def _decodeCmdAppLabel(_cmd: Bytes[MAX_MESSAGE_SIZE]) -> uint16:
     cmdVersion: uint16 = convert(slice(_cmd, 0, 2), uint16)
     assert cmdVersion == CMD_VERSION, "OApp: InvalidVersion"
     return convert(slice(_cmd, 2, 2), uint16)
@@ -83,7 +83,7 @@ def _decodeCmdAppLabel(_cmd: Bytes[MAX_CMD_SIZE]) -> uint16:
 
 @internal
 @pure
-def _decodeRequestV1AppRequestLabel(_request: Bytes[MAX_CMD_SIZE]) -> uint16:
+def _decodeRequestV1AppRequestLabel(_request: Bytes[MAX_MESSAGE_SIZE]) -> uint16:
     requestVersion: uint8 = convert(slice(_request, 0, 1), uint8)
     assert requestVersion == REQUEST_VERSION, "OApp: InvalidVersion"
     return convert(slice(_request, 1, 2), uint16)
@@ -95,8 +95,8 @@ def encode(
     _appCmdLabel: uint16,
     _evmCallRequests: DynArray[EVMCallRequestV1, MAX_EVM_CALL_REQUESTS],
     _evmCallCompute: EVMCallComputeV1 = empty(EVMCallComputeV1),
-) -> Bytes[MAX_CMD_SIZE]:
-    cmd: Bytes[MAX_CMD_SIZE] = concat(
+) -> Bytes[MAX_MESSAGE_SIZE]:
+    cmd: Bytes[MAX_MESSAGE_SIZE] = concat(
         convert(CMD_VERSION, bytes2),
         convert(_appCmdLabel, bytes2),
         convert(convert(len(_evmCallRequests), uint16), bytes2),
@@ -112,8 +112,8 @@ def encode(
 @internal
 @pure
 def appendEVMCallRequestV1(
-    _cmd: Bytes[MAX_CMD_SIZE], _request: EVMCallRequestV1
-) -> Bytes[MAX_CMD_SIZE]:
+    _cmd: Bytes[MAX_MESSAGE_SIZE], _request: EVMCallRequestV1
+) -> Bytes[MAX_MESSAGE_SIZE]:
     """
     @notice Appends an EVM call request to the command
     @param _cmd The existing command bytes
@@ -122,11 +122,11 @@ def appendEVMCallRequestV1(
     """
 
     # dev: assert that appending new request to existing command will not exceed the max size
-    assert (len(_cmd) + MAX_CALLDATA_SIZE + 42 <= MAX_CMD_SIZE), "OApp: Command too large"
+    assert (len(_cmd) + MAX_CALLDATA_SIZE + 42 <= MAX_MESSAGE_SIZE), "OApp: Command too large"
     # dev: 42 is length of all fields excluding existing command and callData
     return concat(
         # current cmd
-        abi_decode(abi_encode(_cmd), (Bytes[MAX_CMD_SIZE - MAX_CALLDATA_SIZE - 42])),
+        abi_decode(abi_encode(_cmd), (Bytes[MAX_MESSAGE_SIZE - MAX_CALLDATA_SIZE - 42])),
         # newCmd
         convert(REQUEST_VERSION, bytes1),
         convert(_request.appRequestLabel, bytes2),
@@ -145,8 +145,8 @@ def appendEVMCallRequestV1(
 @internal
 @pure
 def appendEVMCallComputeV1(
-    _cmd: Bytes[MAX_CMD_SIZE], _compute: EVMCallComputeV1
-) -> Bytes[MAX_CMD_SIZE]:
+    _cmd: Bytes[MAX_MESSAGE_SIZE], _compute: EVMCallComputeV1
+) -> Bytes[MAX_MESSAGE_SIZE]:
     """
     @notice Appends an EVM call compute to the command
     @param _cmd The existing command bytes
@@ -154,10 +154,10 @@ def appendEVMCallComputeV1(
     @return The updated command bytes
     """
 
-    assert len(_cmd) + 39 <= MAX_CMD_SIZE, "OApp: Command too large"
+    assert len(_cmd) + 39 <= MAX_MESSAGE_SIZE, "OApp: Command too large"
     # dev: 39 is length of all fields excluding existing command
     return concat(
-        abi_decode(abi_encode(_cmd), (Bytes[MAX_CMD_SIZE - 39])),
+        abi_decode(abi_encode(_cmd), (Bytes[MAX_MESSAGE_SIZE - 39])),
         convert(COMPUTE_VERSION, bytes1),
         convert(COMPUTE_TYPE_SINGLE_VIEW_EVM_CALL, bytes2),
         convert(_compute.computeSetting, bytes1),

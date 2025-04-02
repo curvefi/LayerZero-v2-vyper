@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.12"
 
 [[package]]
@@ -1293,9 +1294,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "snekmate", specifier = "==0.1.0" },
-    { name = "titanoboa", git = "https://github.com/vyperlang/titanoboa.git?rev=b6baf252603c70531e26208c06172b8c82d36033" },
-    { name = "vyper", specifier = ">=0.4.0" },
+    { name = "snekmate", specifier = "==0.1.1rc1" },
+    { name = "titanoboa", specifier = "==0.2.6" },
+    { name = "vyper", specifier = "==0.4.1" },
     { name = "web3", specifier = ">=7.6.0" },
 ]
 
@@ -2402,11 +2403,11 @@ wheels = [
 
 [[package]]
 name = "snekmate"
-version = "0.1.0"
+version = "0.1.1rc1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a5/47/33f865f94c8892e3be93eaa103289709dd373442a02dc689452b18527f62/snekmate-0.1.0.tar.gz", hash = "sha256:8446b4c1aac8bf80b5e6a7e4fe7e9b2547200fabd9577bf6e22a2e79ba88d5de", size = 94723 }
+sdist = { url = "https://files.pythonhosted.org/packages/99/29/9e6fc5583cf9b307e7243ccb419cfdbb225c6ba164d1c81a37894370261a/snekmate-0.1.1rc1.tar.gz", hash = "sha256:cdef6e2b6f8e1121f82f4254877456abfee405765038e86bf2424d9e2001916e", size = 97656 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/1c/8d5285626ee40f297cc4bf944ffcb1c4bf02c966fb34ee8c452ab9b232d7/snekmate-0.1.0-py3-none-any.whl", hash = "sha256:0f56078c4237f2f57704ec6c974378751c5f30fb2c19f406aec2f173c002ab85", size = 112946 },
+    { url = "https://files.pythonhosted.org/packages/28/6c/4cbbcaff436fe2360422cadb5f9859c8fc1716a1eae40c09d7bc21eac4a4/snekmate-0.1.1rc1-py3-none-any.whl", hash = "sha256:66255362405019efcf68a990fc162f34d4ea6f9ef1335680fe5a8b273ac54ae6", size = 115432 },
 ]
 
 [[package]]
@@ -2478,8 +2479,8 @@ wheels = [
 
 [[package]]
 name = "titanoboa"
-version = "0.2.5"
-source = { git = "https://github.com/vyperlang/titanoboa.git?rev=b6baf252603c70531e26208c06172b8c82d36033#b6baf252603c70531e26208c06172b8c82d36033" }
+version = "0.2.6"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "eth-abi" },
     { name = "eth-account" },
@@ -2495,6 +2496,10 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "vvm" },
     { name = "vyper" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/51/0d/cccf3b3cde2eb69ac76f4737fcee9c7045a294c402227a22d12736f8dba2/titanoboa-0.2.6.tar.gz", hash = "sha256:6bbf0063bfc5d7ffab5044da53e23564fcb4cf5cfe39b1e31a2c01df8ccb96e0", size = 99448 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c2/03/1636b511faefb99448180c18a33c3e6b04dcc92e7e8900ab4e086ad70067/titanoboa-0.2.6-py3-none-any.whl", hash = "sha256:63bee3b97428697fa2f269c2d2ecbc763b372dc774e3f6229c90f32827bd1967", size = 111043 },
 ]
 
 [[package]]
@@ -2626,19 +2631,20 @@ wheels = [
 
 [[package]]
 name = "vyper"
-version = "0.4.0"
+version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asttokens" },
     { name = "cbor2" },
     { name = "importlib-metadata" },
+    { name = "lark" },
     { name = "packaging" },
     { name = "pycryptodome" },
     { name = "wheel" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2b/09/befae43f33161cf817590337f5ea12e8849e401eaaca9eeea22852ae90d1/vyper-0.4.0.tar.gz", hash = "sha256:9687145c6a0bf42de52e92202ce9a913648d3c657ac8e5cfb9b35a100dc47e34", size = 672136 }
+sdist = { url = "https://files.pythonhosted.org/packages/b3/f1/3848bc040c2715bf77e80cc8cd03359257a959d9cf4a037a3506804cb995/vyper-0.4.1.tar.gz", hash = "sha256:2a219b895c9b5ad6a71237a6fb7d03a6eccaa800faa30ba32418847e350a95e3", size = 734208 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/37/0b/7c14ae8aec83187a67d8c13a4fdff9bc4d72d9ef822ec7ce026b301a00cb/vyper-0.4.0-py3-none-any.whl", hash = "sha256:22d7e1eca229e95a909dc971ff5b1685c8379404e3fc3b7b84dbc59b5de1c262", size = 338856 },
+    { url = "https://files.pythonhosted.org/packages/2f/3f/fb474ea7f3e00a16fb23ea01e1844977e450aca7962e7ad9d11badb61683/vyper-0.4.1-py3-none-any.whl", hash = "sha256:b22e19e20557b3c13fa2721efabc4e926f624af9a3bd328e1da8fb6b727d908f", size = 370776 },
 ]
 
 [[package]]
