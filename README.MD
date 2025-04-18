@@ -1,3 +1,6 @@
+# ACTUAL VERSION IS IN OAPP-RREWRITE BRANCH
+# TO BE MERGED AFTER AUDIT
+
 # LayerZero V2 Vyper Module
 
 This module rewrites all the important LayerZero V2 endpoint interfaces in Vyper into a standalone package. It’s built for anyone looking to integrate cross-chain messaging into their projects with ease and security. Curve Blockahs Oracle is powered by this module (GitHub link coming soon).
