@@ -374,7 +374,9 @@ def _lzSend(
         # Pay LZ token fee by sending tokens to the endpoint.
         lzToken: address = staticcall endpoint.lzToken()
         assert lzToken != empty(address), "OApp: LZ token unavailable"
-        extcall IERC20(lzToken).transferFrom(msg.sender, endpoint.address, lzToken_fee)
+        # Use default_return_value to handle non-standard ERC20 tokens like USDT
+        success: bool = extcall IERC20(lzToken).transferFrom(msg.sender, endpoint.address, lzToken_fee, default_return_value=True)
+        assert success, "OApp: token transfer failed"
 
     return extcall endpoint.send(
         MessagingParams(
