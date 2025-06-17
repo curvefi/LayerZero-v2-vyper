@@ -144,3 +144,8 @@ def options_builder_contract():
 @pytest.fixture()
 def read_cmd_codec_contract():
     return boa.load("contracts/oapp_vyper/ReadCmdCodecV1.vy")
+
+
+@pytest.fixture()
+def constants():
+    return boa.load("contracts/oapp_vyper/VyperConstants.vy")
