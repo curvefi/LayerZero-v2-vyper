@@ -2,6 +2,7 @@
 
 from binascii import hexlify
 from conftest import _to_bytes32
+import boa
 
 
 def test_new_options(options_builder_contract):
@@ -209,3 +210,34 @@ def test_multiple_options(options_builder_contract):
     assert options[22] == 1, "Second option worker ID should be 1"
     assert int.from_bytes(options[23:25], "big") == 1, "Second option size should be 1 byte"
     assert options[25] == 4, "Second option type should be 4 (ordered execution)"
+
+
+def test_executor_option_size_limit_enforcement(options_builder_contract, constants):
+    """Test executor options respect size limits with proper sanity check"""
+    # Get constants
+    max_size = constants._constants.MAX_OPTIONS_TOTAL_SIZE
+    max_single = constants._constants.MAX_OPTION_SINGLE_SIZE
+
+    # Start with new options
+    options = options_builder_contract.internal.newOptions()
+
+    option_size = 36
+    assert len(options) == 2  # must be TYPE_3 only
+
+    # Calculate max options that fit: (convert_limit - initial_size) // option_size
+    max_options = (max_size - max_single - 4 - 2) // option_size  # 2 for initial, 36 per option
+    max_options += max_single > option_size  # one more could fit, but then assert will fail
+    # Add maximum options
+    for i in range(max_options):
+        options = options_builder_contract.internal.addExecutorLzReceiveOption(
+            options, 100000 + i, 1000 + i
+        )
+
+    # Verify size: initial (2) + options (max_options * 36)
+    assert len(options) == 2 + max_options * option_size
+    print(f"Options: {len(options)}")
+    # Next option should revert due to assert limit
+    with boa.reverts():
+        options_builder_contract.internal.addExecutorLzReceiveOption(
+            options, 100000 + max_options, 1000 + max_options
+        )
