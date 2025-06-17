@@ -1,8 +1,7 @@
-# ACTUAL VERSION IS IN OAPP-REWRITE BRANCH TO BE MERGED AFTER AUDIT
+# LayerZero V2 OApp Vyper Module
 
-# LayerZero V2 Vyper Module
+This module rewrites all the important LayerZero V2 endpoint interfaces in Vyper into a standalone package. It’s built for anyone looking to integrate cross-chain messaging into their projects with ease and security. Curve Blockash Oracle is powered by this module (GitHub link coming soon).
 
-This module rewrites all the important LayerZero V2 endpoint interfaces in Vyper into a standalone package. It’s built for anyone looking to integrate cross-chain messaging into their projects with ease and security. Curve Blockahs Oracle is powered by this module (GitHub link coming soon).
 
 ## Overview
 
@@ -19,7 +18,7 @@ Always ensure proper peer setup and ownership management when deploying. Code ha
 
 Requirements:
 - Python 3.9+
-- Vyper ~=0.4
+- Vyper 0.4.2
 - LayerZero V2 endpoint deployment on your chain of choice
 
 Testing:
@@ -42,4 +41,4 @@ Notably, handling incoming messages can follow a recursive pattern. For example,
 Happy coding!
 
 ## Example Use
-ExampleMessager.vy contract provides a simple example of how to use the module.
+OAppExample.vy contract provides a simple example of how to use the module.
