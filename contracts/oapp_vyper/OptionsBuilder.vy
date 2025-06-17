@@ -75,9 +75,7 @@ def addExecutorOption(
     assert (len(_options) + len(_option) + 4 <= MAX_OPTIONS_TOTAL_SIZE), "OApp: options size exceeded"
 
     return concat(
-        abi_decode(
-            abi_encode(_options), (Bytes[MAX_OPTIONS_TOTAL_SIZE - MAX_OPTION_SINGLE_SIZE - 4])
-        ),  # -4 for header
+        convert(_options, Bytes[MAX_OPTIONS_TOTAL_SIZE - MAX_OPTION_SINGLE_SIZE - 4]), # downcast Bytes size, -4 for header
         convert(EXECUTOR_WORKER_ID, bytes1),
         convert(convert(len(_option) + 1, uint16), bytes2),  # +1 for optionType
         convert(_optionType, bytes1),
