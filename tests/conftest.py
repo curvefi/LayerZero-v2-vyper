@@ -105,7 +105,7 @@ def oapp_module_contract(dev_deployer):
     with boa.env.prank(dev_deployer):
         wrapper_contract = """
         from snekmate.auth import ownable
-        from contracts.oapp_vyper import OApp
+        from src import OApp
 
         initializes: ownable
         initializes: OApp[ownable:=ownable]
