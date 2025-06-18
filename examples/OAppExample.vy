@@ -30,7 +30,7 @@ exports: (
 )
 
 # LayerZero module
-from oapp_vyper import OApp
+from ..src import OApp
 
 initializes: OApp[ownable := ownable]
 exports: (
@@ -44,8 +44,8 @@ exports: (
     OApp.nextNonce,
 )
 
-from oapp_vyper import OptionsBuilder
-from oapp_vyper import ReadCmdCodecV1
+from ..src import OptionsBuilder
+from ..src import ReadCmdCodecV1
 
 ################################################################
 #                            EVENTS                            #
