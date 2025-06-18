@@ -133,19 +133,19 @@ def oapp_module_contract(dev_deployer):
 @pytest.fixture()
 def messenger_contract(dev_deployer):
     with boa.env.prank(dev_deployer):
-        return boa.load("contracts/OAppExample.vy", LZ_ENDPOINT_BASE_SEPOLIA)
+        return boa.load("examples/OAppExample.vy", LZ_ENDPOINT_BASE_SEPOLIA)
 
 
 @pytest.fixture()
 def options_builder_contract():
-    return boa.load("contracts/oapp_vyper/OptionsBuilder.vy")
+    return boa.load("src/OptionsBuilder.vy")
 
 
 @pytest.fixture()
 def read_cmd_codec_contract():
-    return boa.load("contracts/oapp_vyper/ReadCmdCodecV1.vy")
+    return boa.load("src/ReadCmdCodecV1.vy")
 
 
 @pytest.fixture()
 def constants():
-    return boa.load("contracts/oapp_vyper/VyperConstants.vy")
+    return boa.load("src/VyperConstants.vy")
