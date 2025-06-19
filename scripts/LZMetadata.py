@@ -5,9 +5,9 @@ from typing import Dict, Any
 from datetime import datetime
 
 
-class LZDeployments:
+class LZMetadata:
     # Handles LayerZero deployments metadata fetching and caching
-    def __init__(self, filepath: str = "lz_deployments.json"):
+    def __init__(self, filepath: str = "lz_metadata.json"):
         self.api_url = "https://metadata.layerzero-api.com/v1/metadata/deployments"
         self.filepath = filepath
         self.metadata = None
@@ -111,6 +111,6 @@ class LZDeployments:
 
 if __name__ == "__main__":
     # Example usage
-    lz = LZDeployments()
+    lz = LZMetadata()
     chain_data = lz.get_chain_metadata("base-sepolia")
     print(json.dumps(chain_data, indent=4))
