@@ -18,7 +18,7 @@ Always ensure proper peer setup and ownership management when deploying. Code ha
 
 Requirements:
 - Python 3.9+
-- Vyper 0.4.2
+- Vyper 0.4.3
 - LayerZero V2 endpoint deployment on your chain of choice
 
 Testing:
