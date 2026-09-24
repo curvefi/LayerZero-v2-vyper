@@ -124,6 +124,9 @@ def addExecutorNativeDropOption(
     @param _receiver The receiver address for the native drop option.
     @return options The updated options container.
     @dev When multiples of this option are added, they are summed by the executor on the remote chain.
+
+    @dev Vyper-specific: ExecutorOptions.encodeNativeDropOption is inlined here.
+    OnlyType3 is not checked here as it is checked in addExecutorOption.
     """
     option: Bytes[MAX_OPTION_SINGLE_SIZE] = concat(convert(_amount, bytes16), _receiver)
 
@@ -148,6 +151,9 @@ def addExecutorLzComposeOption(
     @dev When multiples of this option are added, they are summed PER index by the executor on the remote chain.
     @dev If the OApp sends N lzCompose calls on the remote, you must provide N incremented indexes starting with 0.
     @dev ie. When your remote OApp composes (N = 3) messages, you must set this option for index 0,1,2
+
+    @dev Vyper-specific: ExecutorOptions.encodeLzComposeOption is inlined here.
+    OnlyType3 is not checked here as it is checked in addExecutorOption.
     """
     option: Bytes[MAX_OPTION_SINGLE_SIZE] = b""
 
@@ -172,6 +178,10 @@ def addExecutorOrderedExecutionOption(
     @dev Adds an executor ordered execution option to the existing options.
     @param _options The existing options container.
     @return options The updated options container.
+
+    @dev Vyper-specific: ExecutorOptions.encodeOrderedExecutionOption returns an
+    empty body, so it is passed directly. OnlyType3 is not checked here as it is
+    checked in addExecutorOption.
     """
     return self.addExecutorOption(_options, OPTION_TYPE_ORDERED_EXECUTION, b"")
 
@@ -188,6 +198,9 @@ def addExecutorLzReadOption(
     @param _size The size of the lzRead() function call.
     @param _value The msg.value for the lzRead return function call.
     @return options The updated options container.
+
+    @dev Vyper-specific: ExecutorOptions.encodeLzReadOption is inlined here.
+    OnlyType3 is not checked here as it is checked in addExecutorOption.
     """
     option: Bytes[MAX_OPTION_SINGLE_SIZE] = b""
 
@@ -243,5 +256,8 @@ def addDVNPreCrimeOption(
     @param _options The existing options container.
     @param _dvnIdx The DVN index for the pre-crime option.
     @return options The updated options container.
+
+    @dev Vyper-specific: the option body is empty and passed directly.
+    OnlyType3 is not checked here as it is checked in addDVNOption.
     """
     return self.addDVNOption(_options, _dvnIdx, OPTION_TYPE_DVN_PRECRIME, b"")
