@@ -2,6 +2,8 @@
 
 import time
 
+import boa
+
 
 def create_evm_call_request(
     read_cmd_codec_contract,
@@ -79,12 +81,12 @@ def test_encode_simple_request(read_cmd_codec_contract):
     assert encoded[2:4] == app_cmd_label.to_bytes(2, byteorder="big")
 
 
-def test_encode_multiple_requests(read_cmd_codec_contract):
-    """Test encoding multiple EVM call requests."""
-    # Create parameters for two requests
+def test_encode_rejects_more_requests_than_the_tuned_limit(read_cmd_codec_contract):
+    """Test that encode takes at most MAX_EVM_CALL_REQUESTS, tuned down to LZBlockRelay's one."""
     app_cmd_label = 1
+    assert read_cmd_codec_contract.eval("MAX_EVM_CALL_REQUESTS") == 1
 
-    # Create first request
+    # Create two requests
     request1 = create_evm_call_request(
         read_cmd_codec_contract,
         1,  # appRequestLabel
@@ -95,8 +97,6 @@ def test_encode_multiple_requests(read_cmd_codec_contract):
         "0x" + "42" * 20,  # to
         bytes.fromhex("112233"),  # callData
     )
-
-    # Create second request
     request2 = create_evm_call_request(
         read_cmd_codec_contract,
         1,  # appRequestLabel
@@ -108,15 +108,13 @@ def test_encode_multiple_requests(read_cmd_codec_contract):
         bytes.fromhex("445566"),  # callData
     )
 
-    # Encode the requests using internal function
-    encoded = read_cmd_codec_contract.internal.encode(app_cmd_label, [request1, request2])
+    # One request encodes, and the count field (bytes 4-5) says so
+    encoded = read_cmd_codec_contract.internal.encode(app_cmd_label, [request1])
+    assert encoded[4:6] == (1).to_bytes(2, byteorder="big")
 
-    # Verify length is greater than 0
-    assert len(encoded) > 0
-    # Basic verification that the app command label is correct (bytes 2-3 in the encoded output)
-    assert encoded[2:4] == app_cmd_label.to_bytes(2, byteorder="big")
-    # Verify the number of requests is 2 (bytes 4-5 in the encoded output)
-    assert encoded[4:6] == (2).to_bytes(2, byteorder="big")
+    # A second request is over the limit
+    with boa.reverts():
+        read_cmd_codec_contract.internal.encode(app_cmd_label, [request1, request2])
 
 
 def test_encode_with_compute(read_cmd_codec_contract):
