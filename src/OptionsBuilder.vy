@@ -73,12 +73,16 @@ def addExecutorOption(
     # Account for header bytes: 1 worker + 2 size + 1 type = 4 bytes
     assert (len(_options) + len(_option) + 4 <= MAX_OPTIONS_TOTAL_SIZE), "OApp: options size exceeded"
 
-    return concat(
-        convert(_options, Bytes[MAX_OPTIONS_TOTAL_SIZE - MAX_OPTION_SINGLE_SIZE - 4]), # downcast Bytes size, -4 for header
-        convert(EXECUTOR_WORKER_ID, bytes1),
-        convert(convert(len(_option) + 1, uint16), bytes2),  # +1 for optionType
-        convert(_optionType, bytes1),
-        _option,
+    # Downcast the result, not the input: the assert above already bounds its length
+    return convert(
+        concat(
+            _options,
+            convert(EXECUTOR_WORKER_ID, bytes1),
+            convert(convert(len(_option) + 1, uint16), bytes2),  # +1 for optionType
+            convert(_optionType, bytes1),
+            _option,
+        ),
+        Bytes[MAX_OPTIONS_TOTAL_SIZE],
     )
 
 
@@ -236,13 +240,17 @@ def addDVNOption(
     # Account for header bytes: 1 worker + 2 size + 1 dvnIdx + 1 type = 5 bytes
     assert (len(_options) + len(_option) + 5 <= MAX_OPTIONS_TOTAL_SIZE), "OApp: dvn options size exceeded"
 
-    return concat(
-        convert(_options, Bytes[MAX_OPTIONS_TOTAL_SIZE - MAX_OPTION_SINGLE_SIZE - 5]), # downcast Bytes size
-        convert(DVN_WORKER_ID, bytes1),
-        convert(convert(len(_option) + 2, uint16), bytes2),  # +2 for optionType and dvnIdx
-        convert(_dvnIdx, bytes1),
-        convert(_optionType, bytes1),
-        _option,
+    # Downcast the result, not the input: the assert above already bounds its length
+    return convert(
+        concat(
+            _options,
+            convert(DVN_WORKER_ID, bytes1),
+            convert(convert(len(_option) + 2, uint16), bytes2),  # +2 for optionType and dvnIdx
+            convert(_dvnIdx, bytes1),
+            convert(_optionType, bytes1),
+            _option,
+        ),
+        Bytes[MAX_OPTIONS_TOTAL_SIZE],
     )
 
 

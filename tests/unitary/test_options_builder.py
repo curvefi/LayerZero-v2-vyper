@@ -224,9 +224,9 @@ def test_executor_option_size_limit_enforcement(options_builder_contract, consta
     option_size = 36
     assert len(options) == 2  # must be TYPE_3 only
 
-    # Calculate max options that fit: (convert_limit - initial_size) // option_size
-    max_options = (max_size - max_single - 4 - 2) // option_size  # 2 for initial, 36 per option
-    max_options += max_single > option_size  # one more could fit, but then assert will fail
+    # Calculate max options that fit: (total_limit - initial_size) // option_size
+    max_options = (max_size - 2) // option_size  # 2 for initial, 36 per option
+    assert option_size <= max_single
     # Add maximum options
     for i in range(max_options):
         options = options_builder_contract.internal.addExecutorLzReceiveOption(
@@ -241,3 +241,32 @@ def test_executor_option_size_limit_enforcement(options_builder_contract, consta
         options_builder_contract.internal.addExecutorLzReceiveOption(
             options, 100000 + max_options, 1000 + max_options
         )
+
+
+def test_add_dvn_option(options_builder_contract):
+    """Test adding a DVN option, laid out as Solidity OptionsBuilder.addDVNOption packs it."""
+    options = options_builder_contract.internal.newOptions()
+    options = options_builder_contract.internal.addDVNOption(options, 7, 9, bytes.fromhex("aabb"))
+
+    # Format: TYPE(0x0003) + WORKER_ID(0x02) + SIZE(0x0004) + DVN_IDX(0x07) + OPTION_TYPE(0x09) + OPTION
+    assert hexlify(options).decode() == "0003" + "02" + "0004" + "07" + "09" + "aabb"
+
+
+def test_add_dvn_precrime_option(options_builder_contract):
+    """Test adding a DVN pre-crime option: an empty body of option type 1."""
+    options = options_builder_contract.internal.newOptions()
+    options = options_builder_contract.internal.addDVNPreCrimeOption(options, 3)
+
+    # Format: TYPE(0x0003) + WORKER_ID(0x02) + SIZE(0x0002) + DVN_IDX(0x03) + OPTION_TYPE(0x01)
+    assert hexlify(options).decode() == "0003" + "02" + "0002" + "03" + "01"
+
+
+def test_executor_and_dvn_options_combined(options_builder_contract):
+    """Test a DVN option appended after an executor option in the same container."""
+    options = options_builder_contract.internal.newOptions()
+    options = options_builder_contract.internal.addExecutorLzReceiveOption(options, 60_000, 0)
+    options = options_builder_contract.internal.addDVNPreCrimeOption(options, 0)
+
+    executor = "01" + "0011" + "01" + (60_000).to_bytes(16, "big").hex()
+    dvn = "02" + "0002" + "00" + "01"
+    assert hexlify(options).decode() == "0003" + executor + dvn
